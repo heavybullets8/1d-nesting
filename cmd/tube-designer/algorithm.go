@@ -49,16 +49,16 @@ func optimizeCutting(cuts []Cut, stockLen int, kerf float64) Solution {
 // firstFitDecreasing implements the FFD algorithm
 func firstFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
 	sticks := []Stick{}
-	kerfInt := int(math.Ceil(kerf * 1000)) // Work in thousandths
+	kerfTh := int(math.Ceil(kerf * 1000)) // kerf in thousandths
+	stockTh := stockLen * 1000            // stock length in thousandths
 
 	for _, cut := range cuts {
 		placed := false
 
 		for i := range sticks {
-			usedLen := calculateUsedLength(sticks[i].Cuts, kerfInt)
-
-			// Check if this cut fits
-			if usedLen+cut.Length+kerfInt/1000 <= stockLen {
+			usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
+			newUsed := usedTh + cut.Length*1000 + kerfTh // add kerf AFTER the cut
+			if newUsed <= stockTh {
 				sticks[i].Cuts = append(sticks[i].Cuts, cut)
 				placed = true
 				break
@@ -73,34 +73,33 @@ func firstFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
 		}
 	}
 
-	return createSolution(sticks, stockLen, kerfInt)
+	return createSolution(sticks, stockLen, kerfTh)
 }
 
-// bestFitDecreasing implements the BFD algorithm - puts each item in the bin with least waste
+// least remaining space (again using thousandths for accuracy).
 func bestFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
 	sticks := []Stick{}
-	kerfInt := int(math.Ceil(kerf * 1000))
+	kerfTh := int(math.Ceil(kerf * 1000))
+	stockTh := stockLen * 1000
 
 	for _, cut := range cuts {
-		bestFit := -1
-		minWaste := stockLen + 1
+		bestIdx := -1
+		minWaste := stockTh + 1
 
-		// Find the stick with minimum waste after adding this cut
 		for i := range sticks {
-			usedLen := calculateUsedLength(sticks[i].Cuts, kerfInt)
-			newUsed := usedLen + cut.Length + kerfInt/1000
-
-			if newUsed <= stockLen {
-				waste := stockLen - newUsed
+			usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
+			newUsed := usedTh + cut.Length*1000 + kerfTh
+			if newUsed <= stockTh {
+				waste := stockTh - newUsed
 				if waste < minWaste {
 					minWaste = waste
-					bestFit = i
+					bestIdx = i
 				}
 			}
 		}
 
-		if bestFit >= 0 {
-			sticks[bestFit].Cuts = append(sticks[bestFit].Cuts, cut)
+		if bestIdx >= 0 {
+			sticks[bestIdx].Cuts = append(sticks[bestIdx].Cuts, cut)
 		} else {
 			sticks = append(sticks, Stick{
 				Cuts:     []Cut{cut},
@@ -108,8 +107,7 @@ func bestFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
 			})
 		}
 	}
-
-	return createSolution(sticks, stockLen, kerfInt)
+	return createSolution(sticks, stockLen, kerfTh)
 }
 
 // alternateLargeSmall reorders cuts to alternate between large and small
@@ -132,30 +130,33 @@ func alternateLargeSmall(cuts []Cut) {
 	}
 }
 
-// calculateUsedLength calculates total used length including kerf
-func calculateUsedLength(cuts []Cut, kerfInt int) int {
+// Kerf is counted only *between* cuts (gaps = n-1).
+func calculateUsedLength(cuts []Cut, kerfTh int) int {
 	if len(cuts) == 0 {
 		return 0
 	}
 
-	usedLen := 0
+	usedTh := 0
 	for _, c := range cuts {
-		usedLen += c.Length
+		usedTh += c.Length * 1000 // convert inches → thousandths
 	}
-	// Add kerf for each cut
-	usedLen += len(cuts) * kerfInt / 1000
 
-	return usedLen
+	gaps := len(cuts) - 1
+	if gaps > 0 {
+		usedTh += gaps * kerfTh
+	}
+	return usedTh
 }
 
 // createSolution creates a Solution from sticks
-func createSolution(sticks []Stick, stockLen int, kerfInt int) Solution {
+// back to whole inches for reporting.
+func createSolution(sticks []Stick, stockLen int, kerfTh int) Solution {
 	totalWaste := 0
 
 	for i := range sticks {
-		usedLen := calculateUsedLength(sticks[i].Cuts, kerfInt)
-		sticks[i].UsedLen = usedLen
-		sticks[i].WasteLen = stockLen - usedLen
+		usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
+		sticks[i].UsedLen = usedTh / 1000 // back to inches
+		sticks[i].WasteLen = stockLen - sticks[i].UsedLen
 		totalWaste += sticks[i].WasteLen
 	}
 

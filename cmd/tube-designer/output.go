@@ -194,6 +194,7 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Date       string
 		Tubing     string
 		Stock      string
+		NumSticks  int
 		Kerf       string
 		TotalStock string
 		TotalWaste string
@@ -202,17 +203,20 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Patterns   []patternData
 	}
 
+	// Prepare pattern data for the template ---------------------------------
 	kerfInt := int(math.Ceil(kerf * 1000))
 	patterns := groupPatterns(solution.Sticks)
-
 	var patData []patternData
+
 	for _, p := range patterns {
+		// Build human‑readable cut list (e.g. 7'6", 3'4", ...)
 		var cutStrs []string
 		for _, c := range p.Cuts {
 			cutStrs = append(cutStrs, prettyLen(c.Length))
 		}
 		cutList := strings.Join(cutStrs, ", ")
 
+		// Build step‑by‑step marking instructions for this pattern
 		runningLen := 0
 		var instr []cutInstr
 		for i, c := range p.Cuts {
@@ -220,10 +224,7 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 				runningLen += kerfInt / 1000
 			}
 			markAt := runningLen + c.Length
-			instr = append(instr, cutInstr{
-				Mark: prettyLen(markAt),
-				Len:  prettyLen(c.Length),
-			})
+			instr = append(instr, cutInstr{Mark: prettyLen(markAt), Len: prettyLen(c.Length)})
 			runningLen = markAt
 		}
 
@@ -236,6 +237,7 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		})
 	}
 
+	// Overall job stats -------------------------------------------------------
 	totalStock := solution.NumSticks * stockLen
 	efficiency := float64(totalStock-solution.TotalWaste) / float64(totalStock) * 100
 
@@ -243,6 +245,7 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Date:       time.Now().Format("2006-01-02"),
 		Tubing:     tubing,
 		Stock:      prettyLen(stockLen),
+		NumSticks:  solution.NumSticks,
 		Kerf:       fmt.Sprintf("%.4f\"", kerf),
 		TotalStock: prettyLen(totalStock),
 		TotalWaste: prettyLen(solution.TotalWaste),
@@ -251,24 +254,46 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Patterns:   patData,
 	}
 
+	// ------------------------------------------------------------------------
+	// HTML template (embedded CSS for a clean, printable look)
+	// ------------------------------------------------------------------------
 	const tpl = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Cut Plan</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1, h2, h3 { color: #333; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        :root {
+            --primary: #05445E;
+            --accent : #189AB4;
+            --light  : #D4F1F4;
+            --gray   : #ECECEC;
+            --border : #C7C7C7;
+        }
+        *      { box-sizing: border-box; }
+        body   { font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+                 margin: 0 auto; max-width: 960px; padding: 24px;
+                 color: #333; background: #fff; }
+        h1     { color: var(--primary); margin-top: 0; }
+        h2     { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        table  { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { padding: 10px 8px; border: 1px solid var(--border); }
+        th     { background: var(--gray); text-align: left; }
+        tr:nth-child(even) td { background: var(--light); }
+        ul     { margin: 0 0 16px 20px; }
+        .tag   { display: inline-block; background: var(--accent);
+                 color: #fff; padding: 2px 8px; border-radius: 4px;
+                 font-size: 0.8rem; margin-left: 6px; }
     </style>
 </head>
 <body>
 <h1>Cut Plan</h1>
-<p>Date: {{.Date}}</p>
-<p>Material: {{.Tubing}} @ {{.Stock}}</p>
-<p>Kerf: {{.Kerf}}</p>
+<p>
+    <strong>Date:</strong> {{.Date}}<br>
+    <strong>Material:</strong> {{.Tubing}} @ {{.Stock}}<br>
+    <strong>Kerf:</strong> {{.Kerf}}<br>
+    <strong>Sticks needed:</strong> {{.NumSticks}} × {{.Stock}}
+</p>
 
 <h2>Efficiency Summary</h2>
 <ul>
@@ -292,7 +317,7 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 </table>
 
 {{range $idx, $p := .Patterns}}
-<h3>Pattern {{$idx | inc}} – Qty {{$p.Count}}</h3>
+<h3>Pattern {{$idx | inc}}<span class="tag">Qty {{$p.Count}}</span></h3>
 <table>
     <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>
     {{range $i, $c := $p.Instr}}
@@ -305,6 +330,9 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 </body>
 </html>`
 
+	// ------------------------------------------------------------------------
+	// Template execution
+	// ------------------------------------------------------------------------
 	t := template.Must(template.New("page").Funcs(template.FuncMap{"inc": func(i int) int { return i + 1 }}).Parse(tpl))
 
 	f, err := os.Create(filename)

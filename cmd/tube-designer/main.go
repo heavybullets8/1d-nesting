@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -165,14 +166,34 @@ func main() {
 }
 
 func openFile(name string) error {
+	// Convert to absolute path so OS launchers can always find the file.
+	absPath, err := filepath.Abs(name)
+	if err != nil {
+		absPath = name // fall back to original
+	}
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", name)
+		// Works in both PowerShell and cmd without quoting headaches.
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", absPath)
 	case "darwin":
-		cmd = exec.Command("open", name)
-	default:
-		cmd = exec.Command("xdg-open", name)
+		cmd = exec.Command("open", absPath)
+	default: // Linux / *nix
+		// Prefer xdg-open, then gio, then sensible-browser.
+		switch {
+		case exec.Command("which", "xdg-open").Run() == nil:
+			cmd = exec.Command("xdg-open", absPath)
+		case exec.Command("which", "gio").Run() == nil:
+			cmd = exec.Command("gio", "open", absPath)
+		case exec.Command("which", "sensible-browser").Run() == nil:
+			cmd = exec.Command("sensible-browser", absPath)
+		default:
+			return fmt.Errorf("cannot find a browser opener (xdg-open/gio/sensible-browser); open %s manually", absPath)
+		}
 	}
+
+	cmd.Stdout = os.Stdout // surface any messages
+	cmd.Stderr = os.Stderr
 	return cmd.Start()
 }
