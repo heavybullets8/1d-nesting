@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -149,4 +151,28 @@ func main() {
 
 	// 6. Print results
 	printResults(tubing, stockIn, kerfIn, cuts, solution)
+
+	// Also generate an HTML version for the operator
+	htmlFile := "cut_plan.html"
+	if err := generateHTML(htmlFile, tubing, stockIn, kerfIn, cuts, solution); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write HTML output: %v\n", err)
+	} else {
+		fmt.Printf("HTML output written to %s\n", htmlFile)
+		if err := openFile(htmlFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open HTML file: %v\n", err)
+		}
+	}
+}
+
+func openFile(name string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", name)
+	case "darwin":
+		cmd = exec.Command("open", name)
+	default:
+		cmd = exec.Command("xdg-open", name)
+	}
+	return cmd.Start()
 }
