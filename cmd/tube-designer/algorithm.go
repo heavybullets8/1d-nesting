@@ -1,94 +1,381 @@
 package main
 
 import (
+	"fmt"
 	"math"
+	"os"
+	"os/signal"
 	"sort"
+	"syscall"
+	"time"
 )
 
-// optimizeCutting uses a branch-and-bound approach for better optimization
+// Global flag to handle graceful shutdown
+var searchCancelled = false
+
+// optimizeCutting always uses branch-and-bound after getting initial BFD solution
 func optimizeCutting(cuts []Cut, stockLen int, kerf float64) Solution {
-	// Sort cuts by length (descending)
-	sort.Slice(cuts, func(i, j int) bool { return cuts[i].Length > cuts[j].Length })
+	// Set up signal handling for Ctrl+C
+	setupSignalHandler()
 
-	// First, get a baseline solution using FFD
-	baselineSolution := firstFitDecreasing(cuts, stockLen, kerf)
+	// First, get a good initial solution using BFD
+	initialSolution := bestFitDecreasing(cuts, stockLen, kerf)
 
-	// If we have few enough cuts, try more exhaustive search
-	if len(cuts) <= 15 {
-		// Try different orderings to find better solutions
-		bestSolution := baselineSolution
+	// Calculate theoretical lower bound
+	totalLength := 0
+	for _, cut := range cuts {
+		totalLength += cut.Length
+	}
+	kerfTh := int(math.Ceil(kerf * 1000))
+	totalLength *= 1000                     // convert to thousandths
+	totalLength += (len(cuts) - 1) * kerfTh // minimum kerf if all cuts were in one long tube
+	theoreticalMin := int(math.Ceil(float64(totalLength) / float64(stockLen*1000)))
 
-		// Try a few heuristics
-		heuristics := []func([]Cut){
-			// Already sorted by length descending
-			func(c []Cut) {},
-			// Sort by length ascending
-			func(c []Cut) { sort.Slice(c, func(i, j int) bool { return c[i].Length < c[j].Length }) },
-			// Alternate large and small
-			func(c []Cut) { alternateLargeSmall(c) },
-		}
+	fmt.Printf("\nInitial solution: %d sticks\n", initialSolution.NumSticks)
+	fmt.Printf("Theoretical minimum: %d sticks\n", theoreticalMin)
+	fmt.Printf("Starting optimization... (Press Ctrl+C to stop and use current best solution)\n")
+	fmt.Println("=== Search Progress ===")
 
-		for _, h := range heuristics {
-			cutsCopy := make([]Cut, len(cuts))
-			copy(cutsCopy, cuts)
-			h(cutsCopy)
-
-			solution := firstFitDecreasing(cutsCopy, stockLen, kerf)
-			if solution.TotalWaste < bestSolution.TotalWaste {
-				bestSolution = solution
-			}
-		}
-
-		return bestSolution
+	// If initial solution is already at theoretical minimum, we're done
+	if initialSolution.NumSticks <= theoreticalMin {
+		fmt.Println("Already at theoretical minimum!")
+		return initialSolution
 	}
 
-	// For larger problems, use enhanced FFD with best-fit
-	return bestFitDecreasing(cuts, stockLen, kerf)
+	// Run branch-and-bound with the initial solution as upper bound
+	optimized := branchAndBoundWithProgress(cuts, stockLen, kerf, initialSolution, theoreticalMin)
+
+	// Apply simple improvement step
+	finalSolution := iterativeImprovement(optimized, stockLen, kerf)
+
+	fmt.Printf("\nOptimization complete!\n")
+	fmt.Printf("Final solution: %d sticks (saved %d)\n",
+		finalSolution.NumSticks,
+		initialSolution.NumSticks-finalSolution.NumSticks)
+
+	return finalSolution
 }
 
-// firstFitDecreasing implements the FFD algorithm
-func firstFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
-	sticks := []Stick{}
-	kerfTh := int(math.Ceil(kerf * 1000)) // kerf in thousandths
-	stockTh := stockLen * 1000            // stock length in thousandths
+// setupSignalHandler configures graceful shutdown on Ctrl+C
+func setupSignalHandler() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	for _, cut := range cuts {
-		placed := false
+	go func() {
+		<-c
+		fmt.Printf("\n\nReceived Ctrl+C - stopping search and using current best solution...\n")
+		searchCancelled = true
+	}()
+}
 
-		for i := range sticks {
-			usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
-			newUsed := usedTh + cut.Length*1000 + kerfTh // add kerf AFTER the cut
-			if newUsed <= stockTh {
-				sticks[i].Cuts = append(sticks[i].Cuts, cut)
-				placed = true
-				break
-			}
+// branchAndBoundWithProgress runs branch-and-bound with live progress display
+func branchAndBoundWithProgress(cuts []Cut, stockLen int, kerf float64, initialSolution Solution, theoreticalMin int) Solution {
+	kerfTh := int(math.Ceil(kerf * 1000))
+	stockTh := stockLen * 1000
+
+	// Convert and sort cuts
+	sortedCuts := make([]indexedCut, len(cuts))
+	for i, c := range cuts {
+		sortedCuts[i] = indexedCut{
+			index:  i,
+			length: c.Length * 1000,
+			cut:    c,
 		}
+	}
+	sort.Slice(sortedCuts, func(i, j int) bool {
+		return sortedCuts[i].length > sortedCuts[j].length
+	})
 
-		if !placed {
-			sticks = append(sticks, Stick{
-				Cuts:     []Cut{cut},
-				StockLen: stockLen,
-			})
+	// Calculate total material needed for efficiency calculation
+	totalMaterialNeeded := 0
+	for _, cut := range cuts {
+		totalMaterialNeeded += cut.Length
+	}
+
+	// Setup branch-and-bound state
+	state := &bbState{
+		cuts:                sortedCuts,
+		stockTh:             stockTh,
+		kerfTh:              kerfTh,
+		bestBins:            initialSolution.NumSticks,
+		bestPacking:         nil,
+		theoreticalMin:      theoreticalMin,
+		startTime:           time.Now(),
+		nodeCount:           0,
+		totalMaterialNeeded: totalMaterialNeeded,
+		stockLen:            stockLen,
+		lastProgressUpdate:  time.Now(),
+		progressUpdateFreq:  time.Second,
+	}
+
+	// Convert initial solution to packing format for starting point
+	initialPacking := convertSolutionToPacking(initialSolution, sortedCuts)
+	if initialPacking != nil {
+		state.bestPacking = initialPacking
+	}
+
+	// Display initial progress
+	state.displayProgress()
+
+	// Run branch-and-bound
+	currentPacking := make([][]indexedCut, 0)
+	branchAndBoundContinuous(state, 0, currentPacking)
+
+	fmt.Printf("\nExplored %d nodes in %.2f seconds\n", state.nodeCount, time.Since(state.startTime).Seconds())
+
+	// If no better solution found, use initial
+	if state.bestPacking == nil {
+		return initialSolution
+	}
+
+	// Convert optimal packing to Solution
+	sticks := make([]Stick, len(state.bestPacking))
+	for i, bin := range state.bestPacking {
+		sticks[i] = Stick{
+			Cuts:     make([]Cut, len(bin)),
+			StockLen: stockLen,
+		}
+		for j, ic := range bin {
+			sticks[i].Cuts[j] = ic.cut
 		}
 	}
 
 	return createSolution(sticks, stockLen, kerfTh)
 }
 
-// least remaining space (again using thousandths for accuracy).
+// convertSolutionToPacking converts a Solution back to packing format
+func convertSolutionToPacking(solution Solution, sortedCuts []indexedCut) [][]indexedCut {
+	// This is a helper to preserve good solutions
+	// For simplicity, we'll return nil and let branch-and-bound find its own solution
+	return nil
+}
+
+// indexedCut tracks cuts during optimization
+type indexedCut struct {
+	index  int
+	length int // in thousandths
+	cut    Cut
+}
+
+// bbState maintains state for branch-and-bound search
+type bbState struct {
+	cuts                []indexedCut
+	stockTh             int
+	kerfTh              int
+	bestBins            int
+	bestPacking         [][]indexedCut
+	theoreticalMin      int
+	startTime           time.Time
+	nodeCount           int
+	totalMaterialNeeded int
+	stockLen            int
+	lastProgressUpdate  time.Time
+	progressUpdateFreq  time.Duration
+}
+
+// displayProgress shows current search status
+func (state *bbState) displayProgress() {
+	elapsed := time.Since(state.startTime)
+
+	// Calculate current efficiency
+	totalStock := state.bestBins * state.stockLen
+	efficiency := float64(state.totalMaterialNeeded) / float64(totalStock) * 100
+
+	fmt.Printf("\rSticks: %d | Efficiency: %.1f%% | Nodes: %d | Time: %s",
+		state.bestBins,
+		efficiency,
+		state.nodeCount,
+		formatDuration(elapsed))
+}
+
+// formatDuration formats a duration in a human-readable way
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	} else if d < time.Hour {
+		return fmt.Sprintf("%.1fm", d.Minutes())
+	} else {
+		hours := int(d.Hours())
+		minutes := int(d.Minutes()) % 60
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+}
+
+// branchAndBoundContinuous explores packings until manually cancelled
+func branchAndBoundContinuous(state *bbState, cutIndex int, currentPacking [][]indexedCut) {
+	// Check for cancellation
+	if searchCancelled {
+		return
+	}
+
+	state.nodeCount++
+
+	// Update progress display every second
+	if time.Since(state.lastProgressUpdate) >= state.progressUpdateFreq {
+		state.displayProgress()
+		state.lastProgressUpdate = time.Now()
+	}
+
+	// Base case: all cuts placed
+	if cutIndex >= len(state.cuts) {
+		if len(currentPacking) < state.bestBins {
+			state.bestBins = len(currentPacking)
+			state.bestPacking = deepCopyPacking(currentPacking)
+
+			// Update progress immediately when we find a better solution
+			state.displayProgress()
+
+			// If we reached theoretical minimum, we can't do better
+			if state.bestBins <= state.theoreticalMin {
+				fmt.Printf("\nReached theoretical minimum! Stopping search.\n")
+				searchCancelled = true
+				return
+			}
+		}
+		return
+	}
+
+	// Pruning: can't improve if already using too many bins
+	if len(currentPacking) >= state.bestBins {
+		return
+	}
+
+	// Enhanced pruning: if we're far from placing all cuts and already near limit
+	remainingCuts := len(state.cuts) - cutIndex
+	if remainingCuts > 10 && len(currentPacking) >= state.bestBins-1 {
+		return
+	}
+
+	// Calculate tighter lower bound
+	remainingLength := 0
+	maxRemaining := 0
+	for i := cutIndex; i < len(state.cuts); i++ {
+		remainingLength += state.cuts[i].length
+		if state.cuts[i].length > maxRemaining {
+			maxRemaining = state.cuts[i].length
+		}
+	}
+
+	// Consider minimum kerf needed
+	minKerfNeeded := 0
+	if remainingCuts > 1 {
+		// At minimum, largest remaining cut needs its own bin
+		minKerfNeeded = (remainingCuts - 1) * state.kerfTh
+	}
+
+	lowerBound := int(math.Ceil(float64(remainingLength+minKerfNeeded) / float64(state.stockTh)))
+
+	// Prune if lower bound exceeds best solution
+	if len(currentPacking)+lowerBound >= state.bestBins {
+		return
+	}
+
+	currentCut := state.cuts[cutIndex]
+
+	// Try placing in existing bins (try best fit order)
+	binFits := make([]struct {
+		idx   int
+		waste int
+	}, 0)
+
+	for binIdx := range currentPacking {
+		if canFitInBin(state, currentPacking[binIdx], currentCut) {
+			usedLength := 0
+			for _, c := range currentPacking[binIdx] {
+				usedLength += c.length
+			}
+			usedLength += len(currentPacking[binIdx]) * state.kerfTh
+			usedLength += currentCut.length
+			waste := state.stockTh - usedLength
+
+			binFits = append(binFits, struct {
+				idx   int
+				waste int
+			}{binIdx, waste})
+		}
+	}
+
+	// Sort by waste (best fit first)
+	sort.Slice(binFits, func(i, j int) bool {
+		return binFits[i].waste < binFits[j].waste
+	})
+
+	// Try bins in best-fit order
+	for _, bf := range binFits {
+		if searchCancelled {
+			return
+		}
+		currentPacking[bf.idx] = append(currentPacking[bf.idx], currentCut)
+		branchAndBoundContinuous(state, cutIndex+1, currentPacking)
+		currentPacking[bf.idx] = currentPacking[bf.idx][:len(currentPacking[bf.idx])-1]
+
+		// Early termination if we found theoretical minimum
+		if state.bestBins <= state.theoreticalMin || searchCancelled {
+			return
+		}
+	}
+
+	// Try creating a new bin
+	if len(currentPacking)+1 < state.bestBins && !searchCancelled {
+		newBin := []indexedCut{currentCut}
+		newPacking := append(currentPacking, newBin)
+		branchAndBoundContinuous(state, cutIndex+1, newPacking)
+	}
+}
+
+// canFitInBin checks if a cut fits in the given bin with kerf
+func canFitInBin(state *bbState, bin []indexedCut, cut indexedCut) bool {
+	if len(bin) == 0 {
+		return cut.length <= state.stockTh
+	}
+
+	usedLength := 0
+	for _, c := range bin {
+		usedLength += c.length
+	}
+	// Add kerf between existing cuts
+	usedLength += (len(bin) - 1) * state.kerfTh
+
+	// Check if adding new cut with kerf fits
+	newLength := usedLength + state.kerfTh + cut.length
+	return newLength <= state.stockTh
+}
+
+// deepCopyPacking creates a deep copy of the bin packing
+func deepCopyPacking(packing [][]indexedCut) [][]indexedCut {
+	result := make([][]indexedCut, len(packing))
+	for i, bin := range packing {
+		result[i] = make([]indexedCut, len(bin))
+		copy(result[i], bin)
+	}
+	return result
+}
+
+// bestFitDecreasing uses BFD heuristic for initial solution
 func bestFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
+	// Sort cuts by length descending
+	sortedCuts := make([]Cut, len(cuts))
+	copy(sortedCuts, cuts)
+	sort.Slice(sortedCuts, func(i, j int) bool {
+		return sortedCuts[i].Length > sortedCuts[j].Length
+	})
+
 	sticks := []Stick{}
 	kerfTh := int(math.Ceil(kerf * 1000))
 	stockTh := stockLen * 1000
 
-	for _, cut := range cuts {
+	// Place each cut in the bin with least remaining space that fits
+	for _, cut := range sortedCuts {
 		bestIdx := -1
 		minWaste := stockTh + 1
 
 		for i := range sticks {
 			usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
-			newUsed := usedTh + cut.Length*1000 + kerfTh
+			newUsed := usedTh + cut.Length*1000
+			if len(sticks[i].Cuts) > 0 {
+				newUsed += kerfTh
+			}
+
 			if newUsed <= stockTh {
 				waste := stockTh - newUsed
 				if waste < minWaste {
@@ -107,30 +394,82 @@ func bestFitDecreasing(cuts []Cut, stockLen int, kerf float64) Solution {
 			})
 		}
 	}
+
 	return createSolution(sticks, stockLen, kerfTh)
 }
 
-// alternateLargeSmall reorders cuts to alternate between large and small
-func alternateLargeSmall(cuts []Cut) {
-	n := len(cuts)
-	temp := make([]Cut, n)
-	copy(temp, cuts)
+// iterativeImprovement tries to reduce bin count by moving cuts
+func iterativeImprovement(solution Solution, stockLen int, kerf float64) Solution {
+	kerfTh := int(math.Ceil(kerf * 1000))
+	stockTh := stockLen * 1000
 
-	sort.Slice(temp, func(i, j int) bool { return temp[i].Length > temp[j].Length })
+	improved := true
+	maxIterations := 3
+	iteration := 0
 
-	left, right := 0, n-1
-	for i := 0; i < n; i++ {
-		if i%2 == 0 {
-			cuts[i] = temp[left]
-			left++
-		} else {
-			cuts[i] = temp[right]
-			right--
+	for improved && iteration < maxIterations {
+		improved = false
+		iteration++
+
+		// Try to empty bins by redistributing their cuts
+		for i := 0; i < len(solution.Sticks); i++ {
+			if len(solution.Sticks[i].Cuts) == 0 {
+				continue
+			}
+
+			// Can we redistribute all cuts from this bin?
+			canRedistribute := true
+			placements := make([]int, len(solution.Sticks[i].Cuts))
+
+			for j, cut := range solution.Sticks[i].Cuts {
+				placed := false
+				for k := 0; k < len(solution.Sticks); k++ {
+					if k == i {
+						continue
+					}
+
+					usedTh := calculateUsedLength(solution.Sticks[k].Cuts, kerfTh)
+					newUsed := usedTh + cut.Length*1000
+					if len(solution.Sticks[k].Cuts) > 0 {
+						newUsed += kerfTh
+					}
+
+					if newUsed <= stockTh {
+						placements[j] = k
+						placed = true
+						break
+					}
+				}
+
+				if !placed {
+					canRedistribute = false
+					break
+				}
+			}
+
+			// If we can redistribute all cuts, do it
+			if canRedistribute {
+				// Move cuts to their new locations
+				for j := len(solution.Sticks[i].Cuts) - 1; j >= 0; j-- {
+					cut := solution.Sticks[i].Cuts[j]
+					targetBin := placements[j]
+					solution.Sticks[targetBin].Cuts = append(solution.Sticks[targetBin].Cuts, cut)
+				}
+
+				// Remove the now-empty bin
+				solution.Sticks = append(solution.Sticks[:i], solution.Sticks[i+1:]...)
+				solution.NumSticks--
+				improved = true
+				break
+			}
 		}
 	}
+
+	// Recalculate solution metrics
+	return createSolution(solution.Sticks, stockLen, kerfTh)
 }
 
-// Kerf is counted only *between* cuts (gaps = n-1).
+// calculateUsedLength computes total length including kerf
 func calculateUsedLength(cuts []Cut, kerfTh int) int {
 	if len(cuts) == 0 {
 		return 0
@@ -138,9 +477,10 @@ func calculateUsedLength(cuts []Cut, kerfTh int) int {
 
 	usedTh := 0
 	for _, c := range cuts {
-		usedTh += c.Length * 1000 // convert inches → thousandths
+		usedTh += c.Length * 1000
 	}
 
+	// Kerf only between cuts (n-1 gaps)
 	gaps := len(cuts) - 1
 	if gaps > 0 {
 		usedTh += gaps * kerfTh
@@ -148,14 +488,13 @@ func calculateUsedLength(cuts []Cut, kerfTh int) int {
 	return usedTh
 }
 
-// createSolution creates a Solution from sticks
-// back to whole inches for reporting.
+// createSolution builds a Solution from sticks
 func createSolution(sticks []Stick, stockLen int, kerfTh int) Solution {
 	totalWaste := 0
 
 	for i := range sticks {
 		usedTh := calculateUsedLength(sticks[i].Cuts, kerfTh)
-		sticks[i].UsedLen = usedTh / 1000 // back to inches
+		sticks[i].UsedLen = usedTh / 1000
 		sticks[i].WasteLen = stockLen - sticks[i].UsedLen
 		totalWaste += sticks[i].WasteLen
 	}
