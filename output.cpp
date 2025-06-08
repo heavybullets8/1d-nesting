@@ -9,58 +9,79 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <vector>
 
+// Helper function to group identical sticks into patterns for cleaner output
 std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
-  std::map<std::string, Pattern *> patternMap;
+  // Using a map to group sticks by their cutting pattern.
+  // The key is a string representation of the sorted cut lengths.
+  std::map<std::string, Pattern> patternMap;
 
   for (const auto &stick : sticks) {
-    // Create a key based on sorted cut lengths
+    // Create a key based on sorted cut lengths to identify unique patterns
     std::vector<int> lengths;
     for (const auto &cut : stick.cuts) {
       lengths.push_back(cut.length);
     }
+    // Sort descending to make patterns consistent (e.g., 8,5,3 is same as
+    // 3,5,8)
     std::sort(lengths.begin(), lengths.end(), std::greater<int>());
 
-    std::stringstream key;
+    std::stringstream key_ss;
     for (size_t i = 0; i < lengths.size(); i++) {
       if (i > 0)
-        key << "-";
-      key << lengths[i];
+        key_ss << ",";
+      key_ss << lengths[i];
     }
+    std::string key = key_ss.str();
 
-    auto keyStr = key.str();
-    if (patternMap.find(keyStr) != patternMap.end()) {
-      patternMap[keyStr]->count++;
+    // If this pattern already exists, increment its count.
+    // Otherwise, create a new entry for it.
+    auto it = patternMap.find(key);
+    if (it != patternMap.end()) {
+      it->second.count++;
     } else {
-      Pattern *p = new Pattern();
-      p->cuts = stick.cuts;
-      p->count = 1;
-      p->used_len = stick.used_len;
-      p->waste_len = stick.waste_len;
-      patternMap[keyStr] = p;
+      Pattern p;
+      p.cuts = stick.cuts;
+      // Sort the cuts in the pattern struct for consistent display
+      std::sort(p.cuts.begin(), p.cuts.end(),
+                [](const Cut &a, const Cut &b) { return a.length > b.length; });
+      p.count = 1;
+      p.used_len = stick.used_len;
+      p.waste_len = stick.waste_len;
+      patternMap[key] = p;
     }
   }
 
+  // Convert the map of patterns to a vector
   std::vector<Pattern> patterns;
   for (const auto &[key, p] : patternMap) {
-    patterns.push_back(*p);
-    delete p;
+    patterns.push_back(p);
   }
 
-  // Sort by count (descending), then by used length
+  // Sort the final list of patterns by quantity (most common first)
   std::sort(patterns.begin(), patterns.end(),
             [](const Pattern &a, const Pattern &b) {
-              if (a.count == b.count) {
-                return a.used_len < b.used_len;
+              if (a.count != b.count) {
+                return a.count > b.count;
               }
-              return a.count > b.count;
+              return a.used_len > b.used_len; // Secondary sort by used length
             });
 
   return patterns;
 }
 
-void printResults(const std::string &tubing, int stockLen, double kerf,
-                  const std::vector<Cut> &cuts, const Solution &solution) {
+// The [[maybe_unused]] attribute tells the compiler we intentionally
+// aren't using these parameters. This silences the -Wunused-parameter warning.
+void printResults(const std::string &tubing, int stockLen,
+                  [[maybe_unused]] double kerf,
+                  [[maybe_unused]] const std::vector<Cut> &cuts,
+                  const Solution &solution) {
+  if (solution.num_sticks == 0) {
+    std::cout << "\nNo solution found. Check input values.\n";
+    return;
+  }
+
   int totalStock = solution.num_sticks * stockLen;
   double efficiency = 0.0;
   if (totalStock > 0) {
@@ -96,7 +117,8 @@ void printResults(const std::string &tubing, int stockLen, double kerf,
 }
 
 void generateHTML(const std::string &filename, const std::string &tubing,
-                  int stockLen, double kerf, const std::vector<Cut> &cuts,
+                  int stockLen, double kerf,
+                  [[maybe_unused]] const std::vector<Cut> &cuts,
                   const Solution &solution) {
   std::ofstream file(filename);
   if (!file.is_open()) {
@@ -164,7 +186,10 @@ void generateHTML(const std::string &filename, const std::string &tubing,
     <li>Material efficiency: )"
        << std::fixed << std::setprecision(1) << efficiency << R"(%</li>
     <li>Average waste per stick: )"
-       << prettyLen(solution.total_waste / solution.num_sticks) << R"(</li>
+       << (solution.num_sticks > 0
+               ? prettyLen(solution.total_waste / solution.num_sticks)
+               : "N/A")
+       << R"(</li>
 </ul>
 <h2>Cut Patterns</h2>
 <table>
@@ -189,7 +214,7 @@ void generateHTML(const std::string &filename, const std::string &tubing,
 
   // Detailed cut instructions for each pattern
   int patternNum = 1;
-  int kerfInt = static_cast<int>(std::ceil(kerf * 1000));
+  double kerf_d = kerf;
 
   for (const auto &p : patterns) {
     file << "\n<h3>Pattern " << patternNum << "<span class=\"tag\">Qty "
@@ -197,17 +222,17 @@ void generateHTML(const std::string &filename, const std::string &tubing,
     file
         << "<table>\n    <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>";
 
-    int runningLen = 0;
+    double runningLen = 0;
     for (size_t i = 0; i < p.cuts.size(); i++) {
-      if (i > 0) {
-        runningLen += kerfInt / 1000;
-      }
-      int markAt = runningLen + p.cuts[i].length;
+      // The mark is at the END of the piece
+      double markAt = runningLen + p.cuts[i].length;
 
-      file << "\n    <tr><td>" << (i + 1) << "</td><td>" << prettyLen(markAt)
-           << "</td><td>" << prettyLen(p.cuts[i].length) << "</td></tr>";
+      file << "\n    <tr><td>" << (i + 1) << "</td><td>"
+           << prettyLen(round(markAt)) << "</td><td>"
+           << prettyLen(p.cuts[i].length) << "</td></tr>";
 
-      runningLen = markAt;
+      // The next cut starts after this piece and after the kerf
+      runningLen = markAt + kerf_d;
     }
 
     file << "\n    <tr><td colspan=\"3\">Remaining: " << prettyLen(p.waste_len)
@@ -225,11 +250,16 @@ void generateHTML(const std::string &filename, const std::string &tubing,
 }
 
 void openFile(const std::string &filename) {
-  // Use xdg-open for Linux
-  std::string cmd = "xdg-open " + filename + " 2>/dev/null &";
+#if defined(_WIN32)
+  std::string cmd = "start \"\" \"" + filename + "\"";
+#elif defined(__APPLE__)
+  std::string cmd = "open " + filename;
+#else // Linux
+  std::string cmd = "xdg-open \"" + filename + "\" 2>/dev/null";
+#endif
   int result = system(cmd.c_str());
   if (result != 0) {
-    std::cout << "Could not open file automatically. Please open " << filename
-              << " manually.\n";
+    std::cout << "Could not open file automatically. Please open '" << filename
+              << "' manually.\n";
   }
 }
