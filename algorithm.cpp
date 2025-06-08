@@ -1,5 +1,7 @@
 #include "algorithm.h"
+#ifndef NO_HIGHS
 #include <Highs.h>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -12,6 +14,7 @@ std::vector<std::vector<int>>
 generatePatterns(const std::vector<int> &availableCuts, int stockLen,
                  double kerf);
 
+#ifndef NO_HIGHS
 Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
                          double kerf) {
   // Step 1: Generate all possible cutting patterns
@@ -160,6 +163,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
 
   return result;
 }
+#endif // NO_HIGHS
 
 /**
  * @brief Generates all possible unique cutting patterns for a single stick.

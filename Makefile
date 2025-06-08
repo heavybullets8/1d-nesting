@@ -79,15 +79,20 @@ run: all
 # Target to run the built-in tests
 # The project currently only has parser unit tests, so avoid building the
 # main binary (which requires the HiGHS library) when running tests.
-# Running `make test` will build and execute the parser tests.
-test: parse-test
+# Running `make test` will build and execute the unit tests.
+test: parse-test pattern-test
 
 # Build and run unit tests for parser utilities
 tests/parse_test: tests/parse_test.cpp parse.cpp parse.h
 	$(CXX) -std=c++17 -Wall -Wextra -I. tests/parse_test.cpp parse.cpp -o $@
-
 parse-test: tests/parse_test
 	./tests/parse_test
+# Build and run tests for pattern generation
+tests/generate_patterns_test: tests/generate_patterns_test.cpp algorithm.cpp
+	$(CXX) -std=c++17 -Wall -Wextra -DNO_HIGHS -I. tests/generate_patterns_test.cpp algorithm.cpp -o $@
+
+pattern-test: tests/generate_patterns_test
+	./tests/generate_patterns_test
 
 # Target to clean the build directory of generated files
 clean:
@@ -97,7 +102,7 @@ clean:
 
 # Phony targets are commands that are not actual files.
 # This prevents 'make' from getting confused if a file named 'clean' exists.
-.PHONY: all clean run test parse-test
+.PHONY: all clean run test parse-test pattern-test
 
 
 
