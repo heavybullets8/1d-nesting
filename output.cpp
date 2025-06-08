@@ -10,6 +10,9 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#ifdef __EMSCRIPTEN__
+extern std::string g_outputHtml; // from parse.cpp
+#endif
 
 // Helper to find the greatest common divisor for fraction simplification
 int gcd(int a, int b) { return b == 0 ? a : gcd(b, a % b); }
@@ -325,10 +328,21 @@ void generateHTML(const std::string &filename, const std::string &jobName,
 
   file << "\n</table>\n</body>\n</html>";
   file.close();
+#ifdef __EMSCRIPTEN__
+  std::ifstream in(filename);
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  g_outputHtml = buffer.str();
+#endif
   std::cout << "\nVisual cut plan saved to " << filename << std::endl;
 }
 
 void openFile(const std::string &filename) {
+#ifdef __EMSCRIPTEN__
+  // Opening handled by JavaScript in the browser
+  (void)filename;
+  return;
+#else
 #if defined(_WIN32)
   std::string cmd = "start \"\" \"" + filename + "\"";
 #elif defined(__APPLE__)
@@ -341,4 +355,5 @@ void openFile(const std::string &filename) {
     std::cout << "Could not open file automatically. Please open '" << filename
               << "' manually.\n";
   }
+#endif
 }

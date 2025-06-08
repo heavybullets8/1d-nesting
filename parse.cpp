@@ -1,9 +1,13 @@
 #include "parse.h"
 #include <cmath>
 #include <iostream>
+#include <queue>
 #include <regex>
 #include <sstream>
 #include <string>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 /**
  * @brief Parses a string representing a fraction (e.g., "1/2") or a decimal
@@ -150,8 +154,20 @@ std::string prettyLen(int total_inches) {
  * @param defaultValue The value to return if the user enters nothing.
  * @return The user's input or the default value.
  */
+std::queue<std::string> g_inputQueue;
+std::string g_outputHtml;
+
 std::string getInput(const std::string &prompt,
                      const std::string &defaultValue) {
+#ifdef __EMSCRIPTEN__
+  if (!g_inputQueue.empty()) {
+    std::string val = g_inputQueue.front();
+    g_inputQueue.pop();
+    if (val.empty())
+      return defaultValue;
+    return val;
+  }
+#endif
   std::cout << prompt << ": ";
   std::string line;
   std::getline(std::cin, line);
@@ -165,3 +181,23 @@ std::string getInput(const std::string &prompt,
   }
   return line;
 }
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+void wasmSetInput(const char *data) {
+  g_inputQueue = std::queue<std::string>();
+  if (!data)
+    return;
+  std::stringstream ss(data);
+  std::string line;
+  while (std::getline(ss, line)) {
+    // remove CR
+    if (!line.empty() && line.back() == '\r')
+      line.pop_back();
+    g_inputQueue.push(line);
+  }
+}
+
+const char *wasmGetOutput() { return g_outputHtml.c_str(); }
+}
+#endif

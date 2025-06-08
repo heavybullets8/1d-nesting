@@ -16,4 +16,13 @@ std::string prettyLen(int inches);
 std::string getInput(const std::string &prompt,
                      const std::string &defaultValue = "");
 
+#ifdef __EMSCRIPTEN__
+// Functions used by the web UI to preload inputs and retrieve the output HTML
+extern "C" {
+void wasmSetInput(const char *data);
+const char *wasmGetOutput();
+}
+#endif
+
+
 #endif // PARSE_H
