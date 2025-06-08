@@ -77,6 +77,9 @@ int main(int argc, char *argv[]) {
   std::cout << "--- Tube-Designer " << VERSION << " (C++ Edition) ---\n";
   std::cout << "Built: " << BUILD_DATE << "\n\n";
 
+  // ** NEW: Get optional job name **
+  std::string jobName = getInput("Job name (optional)", "Cut Plan");
+
   // 1. Get tubing description
   std::string tubing = getInput("Tubing type (e.g. 2x2)", "2x2");
 
@@ -182,11 +185,11 @@ int main(int argc, char *argv[]) {
             << " seconds.\n";
 
   // 6. Print results
-  printResults(tubing, stockIn, kerfIn, cuts, solution);
+  printResults(jobName, tubing, stockIn, kerfIn, cuts, solution);
 
   // 7. Generate HTML
   std::string htmlFile = "cut_plan.html";
-  generateHTML(htmlFile, tubing, stockIn, kerfIn, cuts, solution);
+  generateHTML(htmlFile, jobName, tubing, stockIn, kerfIn, cuts, solution);
   openFile(htmlFile);
 
   return 0;

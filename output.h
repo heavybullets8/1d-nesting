@@ -6,13 +6,14 @@
 #include <vector>
 
 // Print results to console
-void printResults(const std::string &tubing, int stockLen, double kerf,
-                  const std::vector<Cut> &cuts, const Solution &solution);
-
-// Generate HTML output file
-void generateHTML(const std::string &filename, const std::string &tubing,
+void printResults(const std::string &jobName, const std::string &tubing,
                   int stockLen, double kerf, const std::vector<Cut> &cuts,
                   const Solution &solution);
+
+// Generate HTML output file
+void generateHTML(const std::string &filename, const std::string &jobName,
+                  const std::string &tubing, int stockLen, double kerf,
+                  const std::vector<Cut> &cuts, const Solution &solution);
 
 // Group sticks into patterns for cleaner output
 std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks);

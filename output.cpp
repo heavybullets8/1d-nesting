@@ -105,8 +105,10 @@ std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
   return patterns;
 }
 
-void printResults(const std::string &tubing, int stockLen, double kerf,
-                  const std::vector<Cut> &cuts, const Solution &solution) {
+// ** FIX: Added 'jobName' parameter to match the declaration **
+void printResults(const std::string &jobName, const std::string &tubing,
+                  int stockLen, double kerf, const std::vector<Cut> &cuts,
+                  const Solution &solution) {
   if (solution.num_sticks == 0) {
     std::cout << "\nNo solution found. Check input values.\n";
     return;
@@ -119,7 +121,7 @@ void printResults(const std::string &tubing, int stockLen, double kerf,
                  totalStock * 100.0;
   }
 
-  std::cout << "\n--- Cut Optimization Summary ---\n";
+  std::cout << "\n--- " << jobName << " Summary ---\n";
   std::cout << "Material:      " << tubing << " @ " << prettyLen(stockLen)
             << "\n";
   std::cout << "Kerf:          " << toFraction(kerf) << "\"\n";
@@ -161,9 +163,10 @@ void printResults(const std::string &tubing, int stockLen, double kerf,
   }
 }
 
-void generateHTML(const std::string &filename, const std::string &tubing,
-                  int stockLen, double kerf, const std::vector<Cut> &cuts,
-                  const Solution &solution) {
+// ** FIX: Added 'jobName' parameter to match the declaration **
+void generateHTML(const std::string &filename, const std::string &jobName,
+                  const std::string &tubing, int stockLen, double kerf,
+                  const std::vector<Cut> &cuts, const Solution &solution) {
   std::ofstream file(filename);
   if (!file.is_open()) {
     std::cerr << "Error: Could not create HTML file: " << filename << std::endl;
@@ -191,12 +194,12 @@ void generateHTML(const std::string &filename, const std::string &tubing,
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Cut Plan: )"
-       << tubing << R"(</title>
+    <title>)"
+       << jobName << ": " << tubing << R"(</title>
     <style>
         :root {
             --primary: #0A3D62; --accent: #3C6382; --light: #EAF0F4;
-            --gray: #F0F0F0; --border: #BDBDBD;
+            --gray: #F0F0F0; --border: #AAAAAA; /* Darker gray for better visibility */
             --cut1: #1f77b4; --cut2: #ff7f0e; --cut3: #2ca02c;
             --cut4: #d62728; --cut5: #9467bd; --cut6: #8c564b;
         }
@@ -225,15 +228,19 @@ void generateHTML(const std::string &filename, const std::string &tubing,
             .grid { grid-template-columns: 1fr 1fr; } /* Keep grid on print */
             .no-print { display: none; }
             h1, h2 { page-break-after: avoid; }
-            table, .stock-bar { page-break-inside: avoid; }
-            tr { page-break-inside: avoid; }
+            table, tr { page-break-inside: avoid; }
             .cut-piece, .waste-piece { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            /* ** FIX for table borders not printing ** */
+            table { border-collapse: separate; border-spacing: 0; }
+            th, td { border: 1px solid #777; }
         }
     </style>
 </head>
 <body>
 <div class="header">
-    <h1>Cut Plan</h1>
+    <h1>)"
+       << jobName << R"(</h1>
     <p><strong>Material:</strong> )"
        << tubing << R"(<br><strong>Date:</strong> )" << dateStr.str() << R"(</p>
 </div>
