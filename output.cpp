@@ -105,7 +105,6 @@ std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
   return patterns;
 }
 
-// ** FIX: Added 'jobName' parameter to match the declaration **
 void printResults(const std::string &jobName, const std::string &tubing,
                   int stockLen, double kerf, const std::vector<Cut> &cuts,
                   const Solution &solution) {
@@ -163,7 +162,6 @@ void printResults(const std::string &jobName, const std::string &tubing,
   }
 }
 
-// ** FIX: Added 'jobName' parameter to match the declaration **
 void generateHTML(const std::string &filename, const std::string &jobName,
                   const std::string &tubing, int stockLen, double kerf,
                   const std::vector<Cut> &cuts, const Solution &solution) {

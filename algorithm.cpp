@@ -50,8 +50,6 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
     cutDemand[cut.length]++;
   }
 
-  // ** FIX: Constraints are now equality constraints to prevent over-production
-  // **
   model.lp_.num_row_ = cutDemand.size();
   model.lp_.row_lower_.resize(cutDemand.size());
   model.lp_.row_upper_.resize(
@@ -84,9 +82,6 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
     Astart.push_back(Aindex.size());
   }
 
-  // ** FIX: Set constraint bounds to be exactly the demand **
-  // This changes the constraint from 'sum(pieces) >= demand' to 'sum(pieces) ==
-  // demand'
   int row = 0;
   for (const auto &[cutLen, demand] : cutDemand) {
     model.lp_.row_lower_[row] = demand;
