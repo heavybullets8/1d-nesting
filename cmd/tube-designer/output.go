@@ -15,111 +15,47 @@ func prettyLen(inches int) string {
 	if inches < 0 {
 		return fmt.Sprintf("-%s", prettyLen(-inches))
 	}
-
+	if inches == 0 {
+		return `0"`
+	}
 	ft := inches / 12
 	in := inches % 12
-
 	if ft == 0 {
-		return fmt.Sprintf("%d\"", in)
+		return fmt.Sprintf(`%d"`, in)
 	}
 	if in == 0 {
-		return fmt.Sprintf("%d'", ft)
+		return fmt.Sprintf(`%d'`, ft)
 	}
-	return fmt.Sprintf("%d'%d\"", ft, in)
+	return fmt.Sprintf(`%d'%d"`, ft, in)
 }
 
-// printResults prints all the different output formats
+// printResults prints a concise summary of the solution to the console
 func printResults(tubing string, stockLen int, kerf float64, cuts []Cut, solution Solution) {
-	fmt.Printf("\n=== Cut Optimization Results ===\n")
-	fmt.Printf("Material: %s\n", tubing)
-	fmt.Printf("Stock length: %s (%d inches)\n", prettyLen(stockLen), stockLen)
-	fmt.Printf("Kerf: %.4f\"\n", kerf)
-	fmt.Printf("Total cuts: %d\n", len(cuts))
-	fmt.Printf("Sticks needed: %d\n\n", solution.NumSticks)
-
-	// Summary statistics
 	totalStock := solution.NumSticks * stockLen
-	efficiency := float64(totalStock-solution.TotalWaste) / float64(totalStock) * 100
+	efficiency := 0.0
+	if totalStock > 0 {
+		efficiency = float64(totalStock-solution.TotalWaste) / float64(totalStock) * 100
+	}
 
-	fmt.Printf("=== Efficiency Summary ===\n")
-	fmt.Printf("Total stock used: %s\n", prettyLen(totalStock))
-	fmt.Printf("Total waste: %s\n", prettyLen(solution.TotalWaste))
-	fmt.Printf("Material efficiency: %.1f%%\n", efficiency)
-	fmt.Printf("Average waste per stick: %s\n\n", prettyLen(solution.TotalWaste/solution.NumSticks))
+	fmt.Println("\n--- Cut Optimization Summary ---")
+	fmt.Printf("Material:      %s @ %s\n", tubing, prettyLen(stockLen))
+	fmt.Printf("Sticks Needed: %d\n", solution.NumSticks)
+	fmt.Printf("Efficiency:    %.1f%%\n", efficiency)
+	fmt.Printf("Total Waste:   %s (avg %s per stick)\n",
+		prettyLen(solution.TotalWaste),
+		prettyLen(solution.TotalWaste/solution.NumSticks))
+	fmt.Println("---------------------------------")
 
-	// Detailed cut list
-	fmt.Printf("=== Detailed Cut List ===\n")
-	fmt.Printf("%-8s | %-50s | %-10s | %-10s\n", "Stick #", "Cuts (in order)", "Used", "Waste")
-	fmt.Println(strings.Repeat("-", 85))
-
-	for i, s := range solution.Sticks {
+	// Group sticks into patterns for cleaner output
+	patterns := groupPatterns(solution.Sticks)
+	fmt.Println("\nCut Patterns (Qty | Cuts -> Waste):")
+	for _, p := range patterns {
 		var cutStrs []string
-		for _, c := range s.Cuts {
+		for _, c := range p.Cuts {
 			cutStrs = append(cutStrs, prettyLen(c.Length))
 		}
 		cutList := strings.Join(cutStrs, ", ")
-		if len(cutList) > 48 {
-			cutList = cutList[:45] + "..."
-		}
-
-		fmt.Printf("%-8d | %-50s | %-10s | %-10s\n",
-			i+1,
-			cutList,
-			prettyLen(s.UsedLen),
-			prettyLen(s.WasteLen))
-	}
-
-	// Cut ticket for shop floor
-	fmt.Printf("\n\n=== Shop Floor Cut Ticket ===\n")
-	fmt.Printf("Date: %s\n", time.Now().Format("2006-01-02"))
-	fmt.Printf("Material: %s @ %s\n", tubing, prettyLen(stockLen))
-	fmt.Printf("Kerf: %.4f\"\n", kerf)
-	fmt.Printf("===============================================\n\n")
-
-	kerfInt := int(math.Ceil(kerf * 1000))
-	for i, s := range solution.Sticks {
-		fmt.Printf("STICK #%d (%s stock):\n", i+1, prettyLen(stockLen))
-		fmt.Println("─────────────────────────────")
-
-		runningLen := 0
-		for j, c := range s.Cuts {
-			// Add kerf for the cut
-			if j > 0 {
-				runningLen += kerfInt / 1000
-			}
-			markAt := runningLen + c.Length
-
-			fmt.Printf("  Cut %d: Mark at %s, Cut %s piece\n",
-				j+1,
-				prettyLen(markAt),
-				prettyLen(c.Length))
-
-			runningLen = markAt
-		}
-		fmt.Printf("  → Remaining: %s (waste)\n\n", prettyLen(s.WasteLen))
-	}
-
-	// Waste pieces summary
-	if solution.NumSticks > 1 {
-		fmt.Printf("\n=== Waste Pieces Summary ===\n")
-		wasteMap := make(map[int]int)
-		for _, s := range solution.Sticks {
-			wasteMap[s.WasteLen]++
-		}
-
-		var wasteSizes []int
-		for size := range wasteMap {
-			wasteSizes = append(wasteSizes, size)
-		}
-		sort.Sort(sort.Reverse(sort.IntSlice(wasteSizes)))
-
-		for _, size := range wasteSizes {
-			count := wasteMap[size]
-			fmt.Printf("  %s waste: %d piece%s\n",
-				prettyLen(size),
-				count,
-				plural(count))
-		}
+		fmt.Printf("  %2d × | %s -> %s waste\n", p.Count, cutList, prettyLen(p.WasteLen))
 	}
 }
 
@@ -142,6 +78,11 @@ type Pattern struct {
 func groupPatterns(sticks []Stick) []Pattern {
 	m := make(map[string]*Pattern)
 	for _, s := range sticks {
+		// Sort cuts within the stick to group patterns regardless of cut order
+		sort.Slice(s.Cuts, func(i, j int) bool {
+			return s.Cuts[i].Length > s.Cuts[j].Length
+		})
+
 		var parts []string
 		for _, c := range s.Cuts {
 			parts = append(parts, fmt.Sprintf("%d", c.Length))
@@ -203,20 +144,18 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Patterns   []patternData
 	}
 
-	// Prepare pattern data for the template ---------------------------------
+	// Prepare pattern data for the template
 	kerfInt := int(math.Ceil(kerf * 1000))
 	patterns := groupPatterns(solution.Sticks)
 	var patData []patternData
 
 	for _, p := range patterns {
-		// Build human‑readable cut list (e.g. 7'6", 3'4", ...)
 		var cutStrs []string
 		for _, c := range p.Cuts {
 			cutStrs = append(cutStrs, prettyLen(c.Length))
 		}
 		cutList := strings.Join(cutStrs, ", ")
 
-		// Build step‑by‑step marking instructions for this pattern
 		runningLen := 0
 		var instr []cutInstr
 		for i, c := range p.Cuts {
@@ -237,9 +176,11 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		})
 	}
 
-	// Overall job stats -------------------------------------------------------
 	totalStock := solution.NumSticks * stockLen
-	efficiency := float64(totalStock-solution.TotalWaste) / float64(totalStock) * 100
+	efficiency := 0.0
+	if totalStock > 0 {
+		efficiency = float64(totalStock-solution.TotalWaste) / float64(totalStock) * 100
+	}
 
 	data := pageData{
 		Date:       time.Now().Format("2006-01-02"),
@@ -254,9 +195,6 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
 		Patterns:   patData,
 	}
 
-	// ------------------------------------------------------------------------
-	// HTML template (embedded CSS for a clean, printable look)
-	// ------------------------------------------------------------------------
 	const tpl = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -264,26 +202,19 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
     <title>Cut Plan</title>
     <style>
         :root {
-            --primary: #05445E;
-            --accent : #189AB4;
-            --light  : #D4F1F4;
-            --gray   : #ECECEC;
-            --border : #C7C7C7;
+            --primary: #05445E; --accent: #189AB4; --light: #D4F1F4;
+            --gray: #ECECEC; --border: #C7C7C7;
         }
-        *      { box-sizing: border-box; }
-        body   { font-family: "Segoe UI", Helvetica, Arial, sans-serif;
-                 margin: 0 auto; max-width: 960px; padding: 24px;
-                 color: #333; background: #fff; }
-        h1     { color: var(--primary); margin-top: 0; }
-        h2     { color: var(--accent); border-bottom: 2px solid var(--accent); }
-        table  { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        * { box-sizing: border-box; }
+        body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; margin: 0 auto; max-width: 960px; padding: 24px; color: #333; background: #fff; }
+        h1 { color: var(--primary); margin-top: 0; }
+        h2 { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         th, td { padding: 10px 8px; border: 1px solid var(--border); }
-        th     { background: var(--gray); text-align: left; }
+        th { background: var(--gray); text-align: left; }
         tr:nth-child(even) td { background: var(--light); }
-        ul     { margin: 0 0 16px 20px; }
-        .tag   { display: inline-block; background: var(--accent);
-                 color: #fff; padding: 2px 8px; border-radius: 4px;
-                 font-size: 0.8rem; margin-left: 6px; }
+        ul { margin: 0 0 16px 20px; }
+        .tag { display: inline-block; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 6px; }
     </style>
 </head>
 <body>
@@ -294,7 +225,6 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
     <strong>Kerf:</strong> {{.Kerf}}<br>
     <strong>Sticks needed:</strong> {{.NumSticks}} × {{.Stock}}
 </p>
-
 <h2>Efficiency Summary</h2>
 <ul>
     <li>Total stock used: {{.TotalStock}}</li>
@@ -302,7 +232,6 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
     <li>Material efficiency: {{.Efficiency}}%</li>
     <li>Average waste per stick: {{.AvgWaste}}</li>
 </ul>
-
 <h2>Cut Patterns</h2>
 <table>
     <tr><th>Qty</th><th>Cuts</th><th>Used</th><th>Waste</th></tr>
@@ -315,7 +244,6 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
     </tr>
     {{end}}
 </table>
-
 {{range $idx, $p := .Patterns}}
 <h3>Pattern {{$idx | inc}}<span class="tag">Qty {{$p.Count}}</span></h3>
 <table>
@@ -326,13 +254,9 @@ func generateHTML(filename, tubing string, stockLen int, kerf float64, cuts []Cu
     <tr><td colspan="3">Remaining: {{$p.Waste}}</td></tr>
 </table>
 {{end}}
-
 </body>
 </html>`
 
-	// ------------------------------------------------------------------------
-	// Template execution
-	// ------------------------------------------------------------------------
 	t := template.Must(template.New("page").Funcs(template.FuncMap{"inc": func(i int) int { return i + 1 }}).Parse(tpl))
 
 	f, err := os.Create(filename)

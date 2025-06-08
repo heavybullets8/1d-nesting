@@ -2,6 +2,4 @@ module tube-designer
 
 go 1.21
 
-require (
-// No external dependencies - using only standard library
-)
+require github.com/nextmv-io/sdk v1.4.0

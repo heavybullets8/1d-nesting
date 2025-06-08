@@ -5,45 +5,36 @@
     <title>Cut Plan</title>
     <style>
         :root {
-            --primary: #05445E;
-            --accent : #189AB4;
-            --light  : #D4F1F4;
-            --gray   : #ECECEC;
-            --border : #C7C7C7;
+            --primary: #05445E; --accent: #189AB4; --light: #D4F1F4;
+            --gray: #ECECEC; --border: #C7C7C7;
         }
-        *      { box-sizing: border-box; }
-        body   { font-family: "Segoe UI", Helvetica, Arial, sans-serif;
-                 margin: 0 auto; max-width: 960px; padding: 24px;
-                 color: #333; background: #fff; }
-        h1     { color: var(--primary); margin-top: 0; }
-        h2     { color: var(--accent); border-bottom: 2px solid var(--accent); }
-        table  { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        * { box-sizing: border-box; }
+        body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; margin: 0 auto; max-width: 960px; padding: 24px; color: #333; background: #fff; }
+        h1 { color: var(--primary); margin-top: 0; }
+        h2 { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         th, td { padding: 10px 8px; border: 1px solid var(--border); }
-        th     { background: var(--gray); text-align: left; }
+        th { background: var(--gray); text-align: left; }
         tr:nth-child(even) td { background: var(--light); }
-        ul     { margin: 0 0 16px 20px; }
-        .tag   { display: inline-block; background: var(--accent);
-                 color: #fff; padding: 2px 8px; border-radius: 4px;
-                 font-size: 0.8rem; margin-left: 6px; }
+        ul { margin: 0 0 16px 20px; }
+        .tag { display: inline-block; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 6px; }
     </style>
 </head>
 <body>
 <h1>Cut Plan</h1>
 <p>
-    <strong>Date:</strong> 2025-06-06<br>
+    <strong>Date:</strong> 2025-06-07<br>
     <strong>Material:</strong> 2x2 @ 24&#39;<br>
     <strong>Kerf:</strong> 0.0625&#34;<br>
-    <strong>Sticks needed:</strong> 70 × 24&#39;
+    <strong>Sticks needed:</strong> 69 × 24&#39;
 </p>
-
 <h2>Efficiency Summary</h2>
 <ul>
-    <li>Total stock used: 1680&#39;</li>
-    <li>Total waste: 176&#39;8&#34;</li>
-    <li>Material efficiency: 89.5%</li>
-    <li>Average waste per stick: 2&#39;6&#34;</li>
+    <li>Total stock used: 1656&#39;</li>
+    <li>Total waste: 152&#39;8&#34;</li>
+    <li>Material efficiency: 90.8%</li>
+    <li>Average waste per stick: 2&#39;2&#34;</li>
 </ul>
-
 <h2>Cut Patterns</h2>
 <table>
     <tr><th>Qty</th><th>Cuts</th><th>Used</th><th>Waste</th></tr>
@@ -63,17 +54,10 @@
     </tr>
     
     <tr>
-        <td>7</td>
+        <td>6</td>
         <td>5&#39;, 5&#39;, 5&#39;, 5&#39;, 3&#39;</td>
         <td>23&#39;</td>
         <td>1&#39;</td>
-    </tr>
-    
-    <tr>
-        <td>1</td>
-        <td>3&#39;, 3&#39;</td>
-        <td>6&#39;</td>
-        <td>18&#39;</td>
     </tr>
     
     <tr>
@@ -83,8 +67,14 @@
         <td>2&#39;</td>
     </tr>
     
+    <tr>
+        <td>1</td>
+        <td>5&#39;, 5&#39;, 5&#39;, 5&#39;, 3&#39;, 3&#39;, 3&#39;</td>
+        <td>29&#39;</td>
+        <td>-5&#39;</td>
+    </tr>
+    
 </table>
-
 
 <h3>Pattern 1<span class="tag">Qty 50</span></h3>
 <table>
@@ -120,7 +110,7 @@
     <tr><td colspan="3">Remaining: 3&#39;</td></tr>
 </table>
 
-<h3>Pattern 3<span class="tag">Qty 7</span></h3>
+<h3>Pattern 3<span class="tag">Qty 6</span></h3>
 <table>
     <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>
     
@@ -141,17 +131,6 @@
 <table>
     <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>
     
-    <tr><td>1</td><td>3&#39;</td><td>3&#39;</td></tr>
-    
-    <tr><td>2</td><td>6&#39;</td><td>3&#39;</td></tr>
-    
-    <tr><td colspan="3">Remaining: 18&#39;</td></tr>
-</table>
-
-<h3>Pattern 5<span class="tag">Qty 1</span></h3>
-<table>
-    <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>
-    
     <tr><td>1</td><td>5&#39;</td><td>5&#39;</td></tr>
     
     <tr><td>2</td><td>10&#39;</td><td>5&#39;</td></tr>
@@ -167,6 +146,26 @@
     <tr><td colspan="3">Remaining: 2&#39;</td></tr>
 </table>
 
+<h3>Pattern 5<span class="tag">Qty 1</span></h3>
+<table>
+    <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>
+    
+    <tr><td>1</td><td>5&#39;</td><td>5&#39;</td></tr>
+    
+    <tr><td>2</td><td>10&#39;</td><td>5&#39;</td></tr>
+    
+    <tr><td>3</td><td>15&#39;</td><td>5&#39;</td></tr>
+    
+    <tr><td>4</td><td>20&#39;</td><td>5&#39;</td></tr>
+    
+    <tr><td>5</td><td>23&#39;</td><td>3&#39;</td></tr>
+    
+    <tr><td>6</td><td>26&#39;</td><td>3&#39;</td></tr>
+    
+    <tr><td>7</td><td>29&#39;</td><td>3&#39;</td></tr>
+    
+    <tr><td colspan="3">Remaining: -5&#39;</td></tr>
+</table>
 
 </body>
 </html>
