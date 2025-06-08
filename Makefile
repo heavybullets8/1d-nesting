@@ -1,86 +1,91 @@
-# Makefile for Tube Designer (64-bit only)
+# Makefile for Tube-Designer
 
-# Compiler and flags
+# -----------------
+# Configuration
+# -----------------
+
+# Compiler
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -DNDEBUG
-BINARY_NAME = tube-designer
 
-# Use pkg-config to find the HiGHS library.
-# The '2>/dev/null' suppresses errors if pkg-config fails or isn't installed.
-HIGHS_CFLAGS = $(shell pkg-config --cflags highs 2>/dev/null || echo "")
-HIGHS_LIBS = $(shell pkg-config --libs highs 2>/dev/null || echo "-lhighs")
+# Target executable
+TARGET_DIR = bin
+TARGET = $(TARGET_DIR)/tube-designer
 
-# If pkg-config did not find HiGHS, fall back to common system paths.
-ifeq ($(HIGHS_CFLAGS),)
-    HIGHS_CFLAGS = -I/usr/local/include -I/usr/include
-endif
-
-# Combine base flags with HiGHS-specific flags.
-BASE_CXXFLAGS = $(CXXFLAGS) $(HIGHS_CFLAGS)
-BASE_LDFLAGS = $(HIGHS_LIBS)
-
-# Source code files
+# Source files
 SRCS = main.cpp parse.cpp algorithm.cpp output.cpp
 
-# Phony targets don't represent files and are always executed.
-.PHONY: all clean build test run help check-env debug-pkg
+# Object files (derived from source files)
+OBJS = $(SRCS:.cpp=.o)
 
-# Default target: clean old artifacts and build the new binary.
-all: clean build
+# -----------------
+# Build Flags
+# -----------------
 
-# Build the 64-bit binary.
-build:
-	@echo "Building 64-bit binary..."
-	@mkdir -p bin
-	$(CXX) -m64 $(BASE_CXXFLAGS) $(SRCS) -o bin/$(BINARY_NAME) $(BASE_LDFLAGS)
-	@echo "Binary built: bin/$(BINARY_NAME)"
+# Use shell to find the HiGHS path if available, otherwise use the one from your log
+# This makes the Makefile more portable if you update your Nix environment.
+HIGHS_INSTALL_PATH ?= $(shell nix-build --no-out-link '<nixpkgs>' -A highs)
+# Fallback to the hardcoded path if the above command fails or is not used
+ifeq ($(HIGHS_INSTALL_PATH),)
+    HIGHS_INSTALL_PATH = /nix/store/l5kdwqh5i0g5b8xvifmrm1ql5jjbi3p2-highs-1.8.0
+endif
 
-# Remove all build artifacts.
+
+# Compiler Flags
+# -m64: Build a 64-bit binary
+# -std=c++17: Use the C++17 standard
+# -Wall -Wextra: Enable most common warnings for better code quality
+# -O3: Aggressive optimization for release builds
+# -DNDEBUG: Disable assertions (standard for release builds)
+# -Wno-reorder: Suppress warnings about member initialization order (for HiGHS library)
+# -Wno-unused-parameter: Suppress warnings about unused function parameters (for HiGHS library)
+CXXFLAGS = -m64 -std=c++17 -Wall -Wextra -O3 -DNDEBUG -Wno-reorder -Wno-unused-parameter
+
+# Include directory for header files (e.g., highs/Highs.h)
+INCLUDES = -I$(HIGHS_INSTALL_PATH)/include/highs
+
+# Linker flags for linking against the HiGHS library
+LDFLAGS = -L$(HIGHS_INSTALL_PATH)/lib -lhighs
+
+
+# -----------------
+# Build Rules
+# -----------------
+
+# Default target: 'make' or 'make all' will build the executable
+all: $(TARGET)
+
+# Rule to link the executable from object files
+$(TARGET): $(OBJS)
+	@echo "Linking executable..."
+	@mkdir -p $(TARGET_DIR) # Ensure the bin directory exists
+	$(CXX) -o $(TARGET) $(OBJS) $(LDFLAGS)
+	@echo "Binary built: $(TARGET)"
+
+# Rule to compile a .cpp source file into a .o object file
+# The '-c' flag tells the compiler to stop after compilation and not link.
+%.o: %.cpp
+	@echo "Compiling $<..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# -----------------
+# Utility Rules
+# -----------------
+
+# Target to run the program with default parameters
+run: all
+	./$(TARGET)
+
+# Target to run the built-in tests
+test: all
+	./$(TARGET) --test
+
+# Target to clean the build directory of generated files
 clean:
 	@echo "Cleaning..."
-	@rm -rf bin/
+	rm -f $(OBJS) $(TARGET)
 	@echo "Clean complete."
 
-# Build and run the test suite.
-test: build
-	@echo "Running tests..."
-	./bin/$(BINARY_NAME) --test
+# Phony targets are commands that are not actual files.
+# This prevents 'make' from getting confused if a file named 'clean' exists.
+.PHONY: all clean run test
 
-# Build and run the application.
-run: build
-	./bin/$(BINARY_NAME)
-
-# Display a helpful message with instructions and available targets.
-help:
-	@echo "Tube Designer - C++ Build for Linux (64-bit)"
-	@echo ""
-	@echo "Prerequisites:"
-	@echo "  - A C++17 compatible compiler (e.g., g++)"
-	@echo "  - The HiGHS optimization library (64-bit)"
-	@echo "  - pkg-config (recommended)"
-	@echo ""
-	@echo "Available Targets:"
-	@echo "  make         - Clean and build the binary (default)."
-	@echo "  make build   - Build the binary."
-	@echo "  make test    - Build and run tests."
-	@echo "  make run     - Build and run the application."
-	@echo "  make clean   - Remove all build artifacts."
-	@echo "  make check-env - Check the build environment."
-	@echo "  make debug-pkg - Show the flags found by pkg-config for debugging."
-
-# A target to help debug pkg-config issues with HiGHS.
-debug-pkg:
-	@echo "--- Debugging pkg-config ---"
-	@echo "HiGHS CFLAGS: $(HIGHS_CFLAGS)"
-	@echo "HiGHS LIBS:   $(HIGHS_LIBS)"
-	@echo "Checking pkg-config output:"
-	@pkg-config --list-all | grep highs || echo "NOTE: HiGHS was not found by pkg-config."
-
-# Check the build environment using an external script.
-check-env:
-	@if [ -f check-env.sh ]; then \
-		chmod +x check-env.sh; \
-		bash check-env.sh; \
-	else \
-		echo "check-env.sh not found."; \
-	fi
