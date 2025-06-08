@@ -21,12 +21,12 @@ OBJS = $(SRCS:.cpp=.o)
 # Build Flags
 # -----------------
 
-# Use shell to find the HiGHS path if available, otherwise use the one from your log
-# This makes the Makefile more portable if you update your Nix environment.
-HIGHS_INSTALL_PATH ?= $(shell nix-build --no-out-link '<nixpkgs>' -A highs)
-# Fallback to the hardcoded path if the above command fails or is not used
+# Determine the location of the HiGHS headers. If `nix-build` is available we
+# use it to discover the installation path. Otherwise fall back to a locally
+# vendored copy under `dependencies/highs`.
+HIGHS_INSTALL_PATH ?= $(shell command -v nix-build >/dev/null 2>&1 && nix-build --no-out-link '<nixpkgs>' -A highs)
 ifeq ($(HIGHS_INSTALL_PATH),)
-    HIGHS_INSTALL_PATH = /nix/store/l5kdwqh5i0g5b8xvifmrm1ql5jjbi3p2-highs-1.8.0
+    HIGHS_INSTALL_PATH = $(CURDIR)/dependencies/highs
 endif
 
 
@@ -41,7 +41,8 @@ endif
 CXXFLAGS = -m64 -std=c++17 -Wall -Wextra -O3 -DNDEBUG -Wno-reorder -Wno-unused-parameter
 
 # Include directory for header files (e.g., highs/Highs.h)
-INCLUDES = -I$(HIGHS_INSTALL_PATH)/include/highs
+# The local copy extracted under `dependencies/highs` uses `src`.
+INCLUDES = -I$(HIGHS_INSTALL_PATH)/include/highs -I$(HIGHS_INSTALL_PATH)/src
 
 # Linker flags for linking against the HiGHS library
 LDFLAGS = -L$(HIGHS_INSTALL_PATH)/lib -lhighs
@@ -76,8 +77,10 @@ run: all
 	./$(TARGET)
 
 # Target to run the built-in tests
-test: all
-	./$(TARGET) --test
+# The project currently only has parser unit tests, so avoid building the
+# main binary (which requires the HiGHS library) when running tests.
+# Running `make test` will build and execute the parser tests.
+test: parse-test
 
 # Build and run unit tests for parser utilities
 tests/parse_test: tests/parse_test.cpp parse.cpp parse.h
