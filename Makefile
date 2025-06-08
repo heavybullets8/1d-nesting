@@ -96,3 +96,12 @@ clean:
 # This prevents 'make' from getting confused if a file named 'clean' exists.
 .PHONY: all clean run test parse-test
 
+
+
+# Build WebAssembly version (requires Emscripten and HiGHS built for wasm)
+web:
+	em++ $(SRCS) $(CXXFLAGS) $(INCLUDES) $(LDFLAGS) -s WASM=1 -s EXIT_RUNTIME=1 \
+	-s EXPORTED_RUNTIME_METHODS="[\"ccall\",\"cwrap\",\"FS\"]" \
+	-s EXPORTED_FUNCTIONS="[\"_main\",\"_wasmSetInput\",\"_wasmGetOutput\"]" \
+	-o web/tube.js
+

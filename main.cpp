@@ -9,6 +9,9 @@
 #include "output.h"
 #include "parse.h"
 #include "types.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 // Version information
 const char *VERSION = "1.0.0";
@@ -67,7 +70,7 @@ void runTests() {
   }
 }
 
-int main(int argc, char *argv[]) {
+int runPlanner(int argc, char *argv[]) {
   // Check for test flag
   if (argc > 1 && strcmp(argv[1], "--test") == 0) {
     runTests();
@@ -194,3 +197,9 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+#ifdef __EMSCRIPTEN__
+extern "C" int wasmRun() { return runPlanner(0, nullptr); }
+#endif
+
+int main(int argc, char *argv[]) { return runPlanner(argc, argv); }
