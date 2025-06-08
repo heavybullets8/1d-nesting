@@ -1,2 +1,41 @@
-box_maker.js
-bin/*
+# Compiled object files
+*.o
+*.obj
+
+# Executable
+tube-designer
+tube-designer.exe
+
+# Build directories
+build/
+bin/
+obj/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output files
+cut_plan.html
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# Dependencies
+deps/
+
+# CMake files (if you decide to use CMake later)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.cmake
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
