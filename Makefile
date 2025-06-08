@@ -79,6 +79,13 @@ run: all
 test: all
 	./$(TARGET) --test
 
+# Build and run unit tests for parser utilities
+tests/parse_test: tests/parse_test.cpp parse.cpp parse.h
+	$(CXX) -std=c++17 -Wall -Wextra -I. tests/parse_test.cpp parse.cpp -o $@
+
+parse-test: tests/parse_test
+	./tests/parse_test
+
 # Target to clean the build directory of generated files
 clean:
 	@echo "Cleaning..."
@@ -87,5 +94,5 @@ clean:
 
 # Phony targets are commands that are not actual files.
 # This prevents 'make' from getting confused if a file named 'clean' exists.
-.PHONY: all clean run test
+.PHONY: all clean run test parse-test
 
