@@ -101,18 +101,21 @@ void printResults(const std::string &tubing, int stockLen,
   std::cout << "---------------------------------\n";
 
   auto patterns = groupPatterns(solution.sticks);
-  std::cout << "\nCut Patterns (Qty | Cuts -> Waste):\n";
+  std::cout << "\nCut Patterns:\n";
 
   for (const auto &p : patterns) {
-    std::cout << "  " << std::setw(2) << p.count << " × | ";
+    std::cout << "  " << p.count
+              << " × Sticks (Waste: " << prettyLen(p.waste_len) << ")\n";
 
-    for (size_t i = 0; i < p.cuts.size(); i++) {
-      if (i > 0)
-        std::cout << ", ";
-      std::cout << prettyLen(p.cuts[i].length);
+    std::map<int, int> cutCounts;
+    for (const auto &cut : p.cuts) {
+      cutCounts[cut.length]++;
     }
 
-    std::cout << " -> " << prettyLen(p.waste_len) << " waste\n";
+    for (auto it = cutCounts.rbegin(); it != cutCounts.rend(); ++it) {
+      std::cout << "    - " << it->second << " × " << prettyLen(it->first)
+                << "\n";
+    }
   }
 }
 
@@ -142,7 +145,7 @@ void generateHTML(const std::string &filename, const std::string &tubing,
 
   auto patterns = groupPatterns(solution.sticks);
 
-  // Start HTML output
+  // ** FIX: Added @media print styles to preserve appearance when printing **
   file << R"(<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -152,17 +155,49 @@ void generateHTML(const std::string &filename, const std::string &tubing,
         :root {
             --primary: #05445E; --accent: #189AB4; --light: #D4F1F4;
             --gray: #ECECEC; --border: #C7C7C7;
+            --cut1: #1f77b4; --cut2: #ff7f0e; --cut3: #2ca02c;
+            --cut4: #d62728; --cut5: #9467bd; --cut6: #8c564b;
         }
         * { box-sizing: border-box; }
         body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; margin: 0 auto; max-width: 960px; padding: 24px; color: #333; background: #fff; }
         h1 { color: var(--primary); margin-top: 0; }
         h2 { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
         table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-        th, td { padding: 10px 8px; border: 1px solid var(--border); }
+        th, td { padding: 12px 8px; border: 1px solid var(--border); vertical-align: middle; }
         th { background: var(--gray); text-align: left; }
         tr:nth-child(even) td { background: var(--light); }
         ul { margin: 0 0 16px 20px; }
-        .tag { display: inline-block; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 6px; }
+        .stock-bar { display: flex; height: 35px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
+        .cut-piece, .waste-piece { display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); border-right: 2px solid #fff; }
+        .cut-piece:last-child { border-right: none; }
+        .waste-piece {
+            background: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #d0d0d0 10px, #d0d0d0 20px);
+            color: #555; font-weight: normal; text-shadow: none;
+        }
+        .cut-piece.c1 { background-color: var(--cut1); } .cut-piece.c2 { background-color: var(--cut2); }
+        .cut-piece.c3 { background-color: var(--cut3); } .cut-piece.c4 { background-color: var(--cut4); }
+        .cut-piece.c5 { background-color: var(--cut5); } .cut-piece.c6 { background-color: var(--cut6); }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .cut-piece, .waste-piece {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            h1, h2, p, ul {
+                page-break-after: avoid;
+            }
+            table {
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -193,60 +228,56 @@ void generateHTML(const std::string &filename, const std::string &tubing,
 </ul>
 <h2>Cut Patterns</h2>
 <table>
-    <tr><th>Qty</th><th>Cuts</th><th>Used</th><th>Waste</th></tr>)";
+    <tr><th style="width:8%;">Qty</th><th>Visual Layout per Stick</th><th style="width:12%;">Used</th><th style="width:12%;">Waste</th></tr>)";
 
-  // Pattern summary table
+  // Map unique cut lengths to a color class for consistent coloring
+  std::map<int, std::string> colorMap;
+  int colorIndex = 1;
+
+  // ** NEW: Generate visual bar for each pattern **
   for (const auto &p : patterns) {
     file << "\n    <tr>\n        <td>" << p.count << "</td>\n        <td>";
+    file << "\n            <div class=\"stock-bar\" title=\"Used: "
+         << prettyLen(p.used_len) << " | Waste: " << prettyLen(p.waste_len)
+         << "\">";
 
-    for (size_t i = 0; i < p.cuts.size(); i++) {
-      if (i > 0)
-        file << ", ";
-      file << prettyLen(p.cuts[i].length);
+    // Create a colored div for each cut piece
+    for (const auto &cut : p.cuts) {
+      if (colorMap.find(cut.length) == colorMap.end()) {
+        colorMap[cut.length] = "c" + std::to_string(colorIndex++);
+        if (colorIndex > 6)
+          colorIndex = 1; // Cycle through colors
+      }
+      double width_percent =
+          (static_cast<double>(cut.length) / stockLen) * 100.0;
+      file << "\n                <div class=\"cut-piece "
+           << colorMap[cut.length] << "\" style=\"width: " << std::fixed
+           << std::setprecision(3) << width_percent << "%;\" title=\""
+           << prettyLen(cut.length) << "\">" << prettyLen(cut.length)
+           << "</div>";
     }
 
-    file << "</td>\n        <td>" << prettyLen(p.used_len)
-         << "</td>\n        <td>" << prettyLen(p.waste_len)
-         << "</td>\n    </tr>";
+    // Create a striped div for the waste
+    if (p.waste_len > 0) {
+      double waste_percent =
+          (static_cast<double>(p.waste_len) / stockLen) * 100.0;
+      file << "\n                <div class=\"waste-piece\" style=\"width: "
+           << std::fixed << std::setprecision(3) << waste_percent
+           << "%;\" title=\"Waste: " << prettyLen(p.waste_len) << "\"></div>";
+    }
+
+    file << "\n            </div>\n        </td>";
+    file << "\n        <td>" << prettyLen(p.used_len) << "</td>";
+    file << "\n        <td>" << prettyLen(p.waste_len) << "</td>\n    </tr>";
   }
 
   file << "\n</table>\n";
-
-  // Detailed cut instructions for each pattern
-  int patternNum = 1;
-  double kerf_d = kerf;
-
-  for (const auto &p : patterns) {
-    file << "\n<h3>Pattern " << patternNum << "<span class=\"tag\">Qty "
-         << p.count << "</span></h3>\n";
-    file
-        << "<table>\n    <tr><th>#</th><th>Mark At</th><th>Cut Piece</th></tr>";
-
-    double runningLen = 0;
-    for (size_t i = 0; i < p.cuts.size(); i++) {
-      // The mark is at the END of the piece
-      double markAt = runningLen + p.cuts[i].length;
-
-      file << "\n    <tr><td>" << (i + 1) << "</td><td>"
-           << prettyLen(round(markAt)) << "</td><td>"
-           << prettyLen(p.cuts[i].length) << "</td></tr>";
-
-      // The next cut starts after this piece and after the kerf
-      runningLen = markAt + kerf_d;
-    }
-
-    file << "\n    <tr><td colspan=\"3\">Remaining: " << prettyLen(p.waste_len)
-         << "</td></tr>\n</table>\n";
-
-    patternNum++;
-  }
-
   file << R"(
 </body>
 </html>)";
 
   file.close();
-  std::cout << "\nDetailed cut plan saved to " << filename << std::endl;
+  std::cout << "\nVisual cut plan saved to " << filename << std::endl;
 }
 
 void openFile(const std::string &filename) {
