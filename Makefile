@@ -1,91 +1,86 @@
+# Makefile for Tube Designer (64-bit only)
+
+# Compiler and flags
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -DNDEBUG
 BINARY_NAME = tube-designer
 
-# Use pkg-config to find HiGHS
+# Use pkg-config to find the HiGHS library.
+# The '2>/dev/null' suppresses errors if pkg-config fails or isn't installed.
 HIGHS_CFLAGS = $(shell pkg-config --cflags highs 2>/dev/null || echo "")
 HIGHS_LIBS = $(shell pkg-config --libs highs 2>/dev/null || echo "-lhighs")
 
-# If pkg-config didn't find HiGHS, fall back to standard paths
+# If pkg-config did not find HiGHS, fall back to common system paths.
 ifeq ($(HIGHS_CFLAGS),)
     HIGHS_CFLAGS = -I/usr/local/include -I/usr/include
 endif
 
-# Base flags
+# Combine base flags with HiGHS-specific flags.
 BASE_CXXFLAGS = $(CXXFLAGS) $(HIGHS_CFLAGS)
 BASE_LDFLAGS = $(HIGHS_LIBS)
 
-# Source files
+# Source code files
 SRCS = main.cpp parse.cpp algorithm.cpp output.cpp
 
-# Targets
-.PHONY: all clean build build-32 build-64 test help check-env
+# Phony targets don't represent files and are always executed.
+.PHONY: all clean build test run help check-env debug-pkg
 
+# Default target: clean old artifacts and build the new binary.
 all: clean build
 
-build: build-32 build-64
-
-build-32:
-	@echo "Building 32-bit binary..."
-	@mkdir -p bin
-	@if $(CXX) -m32 $(BASE_CXXFLAGS) $(SRCS) -o bin/$(BINARY_NAME)-32 $(BASE_LDFLAGS) 2>/dev/null; then \
-		echo "32-bit binary built: bin/$(BINARY_NAME)-32"; \
-	else \
-		echo "WARNING: 32-bit build failed. Install g++-multilib and 32-bit libraries."; \
-		echo "Continuing with 64-bit build only..."; \
-	fi
-
-build-64:
+# Build the 64-bit binary.
+build:
 	@echo "Building 64-bit binary..."
 	@mkdir -p bin
-	$(CXX) -m64 $(BASE_CXXFLAGS) $(SRCS) -o bin/$(BINARY_NAME)-64 $(BASE_LDFLAGS)
-	@echo "64-bit binary built: bin/$(BINARY_NAME)-64"
+	$(CXX) -m64 $(BASE_CXXFLAGS) $(SRCS) -o bin/$(BINARY_NAME) $(BASE_LDFLAGS)
+	@echo "Binary built: bin/$(BINARY_NAME)"
 
+# Remove all build artifacts.
 clean:
 	@echo "Cleaning..."
 	@rm -rf bin/
-	@echo "Clean complete"
+	@echo "Clean complete."
 
-test-32: build-32
-	./bin/$(BINARY_NAME)-32 --test
+# Build and run the test suite.
+test: build
+	@echo "Running tests..."
+	./bin/$(BINARY_NAME) --test
 
-test-64: build-64
-	./bin/$(BINARY_NAME)-64 --test
+# Build and run the application.
+run: build
+	./bin/$(BINARY_NAME)
 
-test: test-64
-
-run: build-64
-	./bin/$(BINARY_NAME)-64
-
+# Display a helpful message with instructions and available targets.
 help:
-	@echo "Tube Designer - C++ Build for Linux"
+	@echo "Tube Designer - C++ Build for Linux (64-bit)"
 	@echo ""
 	@echo "Prerequisites:"
-	@echo "  - C++17 compatible compiler with multilib support (g++-multilib)"
-	@echo "  - HiGHS library (32-bit and 64-bit versions)"
-	@echo "  - pkg-config"
+	@echo "  - A C++17 compatible compiler (e.g., g++)"
+	@echo "  - The HiGHS optimization library (64-bit)"
+	@echo "  - pkg-config (recommended)"
 	@echo ""
-	@echo "For 32-bit builds on 64-bit system:"
-	@echo "  Ubuntu: sudo apt install g++-multilib lib32stdc++6"
-	@echo "  NixOS: Add gcc-multilib to your shell.nix"
-	@echo ""
-	@echo "Targets:"
-	@echo "  make         - Build both 32-bit and 64-bit binaries"
-	@echo "  make build-32 - Build 32-bit binary only"
-	@echo "  make build-64 - Build 64-bit binary only"
-	@echo "  make test    - Run tests with 64-bit binary"
-	@echo "  make clean   - Remove build artifacts"
-	@echo "  make check-env - Check build environment"
-	@echo "  make debug-pkg - Debug pkg-config settings"
+	@echo "Available Targets:"
+	@echo "  make         - Clean and build the binary (default)."
+	@echo "  make build   - Build the binary."
+	@echo "  make test    - Build and run tests."
+	@echo "  make run     - Build and run the application."
+	@echo "  make clean   - Remove all build artifacts."
+	@echo "  make check-env - Check the build environment."
+	@echo "  make debug-pkg - Show the flags found by pkg-config for debugging."
 
-# Debug target to check pkg-config
+# A target to help debug pkg-config issues with HiGHS.
 debug-pkg:
+	@echo "--- Debugging pkg-config ---"
 	@echo "HiGHS CFLAGS: $(HIGHS_CFLAGS)"
-	@echo "HiGHS LIBS: $(HIGHS_LIBS)"
-	@echo "Checking pkg-config:"
-	@pkg-config --list-all | grep highs || echo "HiGHS not found in pkg-config"
+	@echo "HiGHS LIBS:   $(HIGHS_LIBS)"
+	@echo "Checking pkg-config output:"
+	@pkg-config --list-all | grep highs || echo "NOTE: HiGHS was not found by pkg-config."
 
-# Check build environment
+# Check the build environment using an external script.
 check-env:
-	@chmod +x check-env.sh 2>/dev/null || true
-	@bash check-env.sh
+	@if [ -f check-env.sh ]; then \
+		chmod +x check-env.sh; \
+		bash check-env.sh; \
+	else \
+		echo "check-env.sh not found."; \
+	fi
