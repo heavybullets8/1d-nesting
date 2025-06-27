@@ -11,7 +11,7 @@
 #include "types.h"
 
 // Version information
-const char *VERSION = "1.0.0";
+const char *VERSION = "1.1.0"; // Updated version
 const char *BUILD_DATE = __DATE__;
 
 // Simple test functions
@@ -21,18 +21,21 @@ void runTests() {
   // Test parseAdvancedLength
   struct TestCase {
     std::string input;
-    int expected;
+    double expected;
   };
 
-  TestCase tests[] = {{"24'", 288},      {"288", 288},     {"20' 6\"", 246},
-                      {"7'6 1/2\"", 91}, {"180 1/2", 181}, {"8'4\"", 100},
-                      {"bad", 0}};
+  // Updated test cases for double values
+  TestCase tests[] = {{"24'", 288.0},       {"288", 288.0},
+                      {"20' 6\"", 246.0},   {"7'6 1/2\"", 90.5},
+                      {"180 1/2", 180.5},   {"8'4\"", 100.0},
+                      {"110 1/8", 110.125}, {"1/16", 0.0625},
+                      {"7' 6 1/2\"", 90.5}, {"bad", 0.0}};
 
   bool allPassed = true;
 
   for (const auto &test : tests) {
-    int result = parseAdvancedLength(test.input);
-    if (result != test.expected) {
+    double result = parseAdvancedLength(test.input);
+    if (std::abs(result - test.expected) > 0.001) {
       std::cout << "FAIL: parseAdvancedLength(\"" << test.input
                 << "\") = " << result << ", expected " << test.expected << "\n";
       allPassed = false;
@@ -77,7 +80,7 @@ int main(int argc, char *argv[]) {
   std::cout << "--- Tube-Designer " << VERSION << " (C++ Edition) ---\n";
   std::cout << "Built: " << BUILD_DATE << "\n\n";
 
-  // ** NEW: Get optional job name **
+  // Get optional job name
   std::string jobName = getInput("Job name (optional)", "Cut Plan");
 
   // 1. Get tubing description
@@ -85,7 +88,7 @@ int main(int argc, char *argv[]) {
 
   // 2. Get stock length
   std::string stockStr = getInput("Stock length (e.g. 24' or 288)", "24'");
-  int stockIn = parseAdvancedLength(stockStr);
+  double stockIn = parseAdvancedLength(stockStr);
   if (stockIn <= 0) {
     std::cerr << "Error: Stock length must be a positive number.\n";
     return 1;
@@ -125,7 +128,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Find the last space to separate length and quantity
-    size_t lastSpace = line.find_last_of(' ');
+    size_t lastSpace = line.find_last_of(" \t");
     if (lastSpace == std::string::npos) {
       std::cout << "  ✖ Invalid format. Please use 'length quantity'.\n";
       continue;
@@ -147,9 +150,9 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    int length = parseAdvancedLength(lengthStr);
+    double length = parseAdvancedLength(lengthStr);
     if (length <= 0) {
-      std::cout << "  ✖ Could not parse length.\n";
+      std::cout << "  ✖ Could not parse length: '" << lengthStr << "'\n";
       continue;
     }
 
@@ -185,12 +188,14 @@ int main(int argc, char *argv[]) {
             << " seconds.\n";
 
   // 6. Print results
-  printResults(jobName, tubing, stockIn, kerfIn, cuts, solution);
+  if (solution.num_sticks > 0) {
+    printResults(jobName, tubing, stockIn, kerfIn, cuts, solution);
 
-  // 7. Generate HTML
-  std::string htmlFile = "cut_plan.html";
-  generateHTML(htmlFile, jobName, tubing, stockIn, kerfIn, cuts, solution);
-  openFile(htmlFile);
+    // 7. Generate HTML
+    std::string htmlFile = "cut_plan.html";
+    generateHTML(htmlFile, jobName, tubing, stockIn, kerfIn, cuts, solution);
+    openFile(htmlFile);
+  }
 
   return 0;
 }

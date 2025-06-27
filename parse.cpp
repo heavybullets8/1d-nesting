@@ -1,9 +1,14 @@
 #include "parse.h"
 #include <cmath>
 #include <iostream>
+#include <numeric>
 #include <regex>
 #include <sstream>
 #include <string>
+
+// Helper to find the greatest common divisor for fraction simplification
+// Made static to prevent linker errors from multiple definitions.
+static int gcd(int a, int b) { return b == 0 ? a : gcd(b, a % b); }
 
 /**
  * @brief Parses a string representing a fraction (e.g., "1/2") or a decimal
@@ -32,11 +37,11 @@ double parseFraction(const std::string &s) {
       }
     }
   } else {
-    // If not a fraction, try to parse as a simple number, ensuring the whole
-    // string is used.
+    // If not a fraction, try to parse as a simple number
     try {
       size_t pos;
       double val = std::stod(trimmed, &pos);
+      // Ensure the whole string was consumed to avoid partial matches
       if (pos == trimmed.length()) {
         return val;
       }
@@ -48,99 +53,125 @@ double parseFraction(const std::string &s) {
 }
 
 /**
- * @brief Parses various length formats into inches.
+ * @brief Parses various length formats into inches as a double.
  *
- * This function can handle:
- * - Simple inches: "288"
- * - Feet notation: "24'"
- * - Feet and inches: "7'6\""
- * - Inches with fractions: "6 1/2"
- * - Mixed numbers: "180 1/2"
- *
+ * Handles formats like: "24'", "7'6\"", "110 1/8", "110.125"
  * @param s The input string.
- * @return The total length in inches, rounded to the nearest whole number.
+ * @return The total length in inches as a double.
  */
-int parseAdvancedLength(const std::string &s) {
+double parseAdvancedLength(const std::string &s) {
   std::string trimmed = std::regex_replace(s, std::regex("^\\s+|\\s+$"), "");
-  if (trimmed.empty()) {
-    return 0;
-  }
+  if (trimmed.empty())
+    return 0.0;
 
-  double total_inches = 0;
-  std::string feet_str, inches_str;
+  double total_inches = 0.0;
 
-  // Check for the feet marker (') and split the string
+  // Handle feet (') and inches (") markers
   size_t feet_pos = trimmed.find('\'');
   if (feet_pos != std::string::npos) {
-    feet_str = trimmed.substr(0, feet_pos);
-    inches_str = trimmed.substr(feet_pos + 1);
+    total_inches += parseFraction(trimmed.substr(0, feet_pos)) * 12.0;
+    trimmed = trimmed.substr(feet_pos + 1);
+  }
+
+  if (!trimmed.empty() && trimmed.back() == '"') {
+    trimmed.pop_back();
+  }
+  trimmed = std::regex_replace(trimmed, std::regex("^\\s+|\\s+$"), "");
+
+  if (trimmed.empty())
+    return total_inches;
+
+  // Handle inches part, which could be a mixed number like "110 1/8"
+  size_t space_pos = trimmed.find_last_of(" \t");
+  if (space_pos != std::string::npos) {
+    std::string part1 = trimmed.substr(0, space_pos);
+    std::string part2 = trimmed.substr(space_pos + 1);
+    // Check if the second part looks like a fraction
+    if (part2.find('/') != std::string::npos) {
+      total_inches += parseFraction(part1);
+      total_inches += parseFraction(part2);
+    } else {
+      // Not a "number fraction" format, so parse the whole string
+      total_inches += parseFraction(trimmed);
+    }
   } else {
-    // No feet marker, the whole string is treated as inches
-    inches_str = trimmed;
+    // No space, so it's a single number or fraction
+    total_inches += parseFraction(trimmed);
   }
 
-  // Parse the feet part if it exists
-  if (!feet_str.empty()) {
-    total_inches += parseFraction(feet_str) * 12.0;
-  }
-
-  // Parse the inches part if it exists
-  if (!inches_str.empty()) {
-    // Remove trailing double-quote if present
-    if (!inches_str.empty() && inches_str.back() == '"') {
-      inches_str.pop_back();
-    }
-    // Trim whitespace again
-    inches_str = std::regex_replace(inches_str, std::regex("^\\s+|\\s+$"), "");
-
-    if (!inches_str.empty()) {
-      // Check for a mixed number format like "6 1/2"
-      std::regex re(R"((\d+)\s+(\d+\s*\/\s*\d+))");
-      std::smatch matches;
-      if (std::regex_match(inches_str, matches, re)) {
-        total_inches += std::stod(matches[1].str());
-        total_inches += parseFraction(matches[2].str());
-      } else {
-        // Otherwise, the remainder is just inches, a fraction, or a decimal
-        total_inches += parseFraction(inches_str);
-      }
-    }
-  }
-
-  return static_cast<int>(round(total_inches));
+  return total_inches;
 }
 
 /**
  * @brief Formats a total number of inches into a human-readable string.
- * e.g., 100 becomes "8'4\""
- * e.g., 288 becomes "24'"
+ * e.g., 100.5 becomes "8' 4 1/2\""
+ * e.g., 288.0 becomes "24'"
  * @param total_inches The length in inches.
  * @return A formatted string.
  */
-std::string prettyLen(int total_inches) {
-  if (total_inches == 0)
+std::string prettyLen(double total_inches) {
+  if (std::abs(total_inches) < 1.0 / 64.0)
     return "0\"";
 
   std::stringstream ss;
-  int feet = total_inches / 12;
-  int inches = total_inches % 12;
-
-  // Account for negative lengths (waste)
   if (total_inches < 0) {
     ss << "-";
-    feet = std::abs(feet);
-    inches = std::abs(inches);
+    total_inches = -total_inches;
   }
 
-  if (feet > 0) {
-    ss << feet << "'";
-    if (inches > 0) {
-      // No space needed between feet and inches for this format
-      ss << inches << "\"";
-    }
-  } else {
-    ss << inches << "\"";
+  // Round to the nearest 1/32 for clean display
+  total_inches = std::round(total_inches * 32.0) / 32.0;
+
+  int feet = static_cast<int>(total_inches / 12.0);
+  double remaining_inches = total_inches - (feet * 12.0);
+
+  if (remaining_inches >= 12.0 - 1.0 / 64.0) {
+    feet++;
+    remaining_inches = 0;
   }
+
+  int inches_whole = static_cast<int>(remaining_inches);
+  double inches_fractional = remaining_inches - inches_whole;
+
+  bool has_feet = feet > 0;
+  bool has_inches = inches_whole > 0;
+  bool has_fraction = inches_fractional > 1.0 / 64.0;
+
+  if (has_feet) {
+    ss << feet << "'";
+  }
+
+  if (has_feet && (has_inches || has_fraction)) {
+    ss << " ";
+  }
+
+  if (has_inches) {
+    ss << inches_whole;
+  }
+
+  if (has_fraction) {
+    if (has_inches) {
+      ss << " ";
+    }
+    int denominator = 32;
+    int numerator =
+        static_cast<int>(std::round(inches_fractional * denominator));
+    if (numerator > 0) {
+      int common = gcd(numerator, denominator);
+      numerator /= common;
+      denominator /= common;
+      ss << numerator << "/" << denominator;
+    }
+  }
+
+  if (!has_feet && !has_inches && !has_fraction) {
+    return "0\"";
+  }
+
+  if (has_inches || has_fraction || !has_feet) {
+    ss << "\"";
+  }
+
   return ss.str();
 }
 

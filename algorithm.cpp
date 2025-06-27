@@ -6,22 +6,35 @@
 #include <iostream>
 #include <set>
 #include <unordered_map>
+#include <vector>
 
-// Forward declaration
-std::vector<std::vector<int>>
-generatePatterns(const std::vector<int> &availableCuts, int stockLen,
-                 double kerf);
+// Use a scaling factor to convert doubles to integers for the MIP solver,
+// avoiding floating-point precision issues. A power of 2 like 1024 (2^10)
+// is good for handling binary fractions like 1/16, 1/32, etc.
+const int PRECISION_SCALE = 1024;
 
-Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
+// Forward declaration for the internal pattern generation function
+static std::vector<std::vector<long long>>
+generatePatterns(const std::vector<long long> &availableCuts,
+                 long long stockLen, long long kerf);
+
+Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
                          double kerf) {
-  // Step 1: Generate all possible cutting patterns
-  std::vector<int> allCuts;
+  // --- SCALING: Convert all double inputs to scaled integers ---
+  long long scaled_stockLen =
+      static_cast<long long>(std::round(stockLen * PRECISION_SCALE));
+  long long scaled_kerf =
+      static_cast<long long>(std::round(kerf * PRECISION_SCALE));
+
+  // Create a list of all required cuts, scaled to integers
+  std::vector<long long> allScaledCuts;
   for (const auto &cut : cuts) {
-    allCuts.push_back(cut.length);
+    allScaledCuts.push_back(
+        static_cast<long long>(std::round(cut.length * PRECISION_SCALE)));
   }
 
-  // Generate valid patterns considering kerf for every cut
-  auto patterns = generatePatterns(allCuts, stockLen, kerf);
+  // Generate valid patterns using scaled integers
+  auto patterns = generatePatterns(allScaledCuts, scaled_stockLen, scaled_kerf);
   if (patterns.empty()) {
     std::cerr << "Error: no valid cutting patterns could be generated. "
                  "Check if any cut is larger than the stock length."
@@ -31,95 +44,80 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
 
   // Step 2: Build the Mixed-Integer Programming (MIP) model using HiGHS
   Highs highs;
+  highs.setOptionValue("output_flag", true); // Keep solver output for now
   HighsModel model;
 
-  // Variables: one integer variable per pattern, representing the number of
-  // times that pattern (stick) is used.
-  model.lp_.num_col_ = patterns.size();
-  model.lp_.col_cost_.resize(patterns.size(),
-                             1.0); // Objective: minimize # of sticks
-  model.lp_.col_lower_.resize(patterns.size(), 0.0);
-  model.lp_.col_upper_.resize(patterns.size(), kHighsInf);
-
-  // All variables must be integers
-  model.lp_.integrality_.resize(patterns.size(), HighsVarType::kInteger);
-
-  // Create a map to track the required demand for each unique cut length
-  std::unordered_map<int, int> cutDemand;
-  for (const auto &cut : cuts) {
-    cutDemand[cut.length]++;
+  // Create a map to track the demand for each unique cut length
+  std::unordered_map<long long, int> cutDemand;
+  for (long long scaled_len : allScaledCuts) {
+    cutDemand[scaled_len]++;
   }
 
+  // Extract unique keys for consistent row ordering
+  std::vector<long long> uniqueCutKeys;
+  for (const auto &[len, demand] : cutDemand) {
+    uniqueCutKeys.push_back(len);
+  }
+  std::sort(uniqueCutKeys.begin(), uniqueCutKeys.end());
+
+  // Variables: one integer variable per pattern
+  model.lp_.num_col_ = patterns.size();
+  model.lp_.col_cost_.assign(patterns.size(),
+                             1.0); // Objective: minimize # of sticks
+  model.lp_.col_lower_.assign(patterns.size(), 0.0);
+  model.lp_.col_upper_.assign(patterns.size(), kHighsInf);
+  model.lp_.integrality_.assign(patterns.size(), HighsVarType::kInteger);
+
+  // Constraints: one for each unique cut length required
   model.lp_.num_row_ = cutDemand.size();
   model.lp_.row_lower_.resize(cutDemand.size());
-  model.lp_.row_upper_.resize(
-      cutDemand.size()); // Upper bound will be set to demand
+  model.lp_.row_upper_.resize(cutDemand.size());
 
   // Build the constraint matrix A (in column-wise format)
-  std::vector<int> Astart;
+  std::vector<int> Astart = {0};
   std::vector<int> Aindex;
   std::vector<double> Avalue;
 
-  Astart.push_back(0);
-
-  // For each pattern (column in the matrix)
-  for (size_t i = 0; i < patterns.size(); i++) {
-    // Count how many of each cut length this pattern produces
-    std::unordered_map<int, int> patternCounts;
-    for (int piece : patterns[i]) {
+  for (const auto &pattern : patterns) {
+    std::unordered_map<long long, int> patternCounts;
+    for (long long piece : pattern) {
       patternCounts[piece]++;
     }
 
-    // Add non-zero entries to the constraint matrix for this pattern
-    int row = 0;
-    for (const auto &[cutLen, demand] : cutDemand) {
-      if (patternCounts.count(cutLen) && patternCounts[cutLen] > 0) {
-        Aindex.push_back(row);
+    for (size_t i = 0; i < uniqueCutKeys.size(); ++i) {
+      long long cutLen = uniqueCutKeys[i];
+      if (patternCounts.count(cutLen) > 0) {
+        Aindex.push_back(i);
         Avalue.push_back(patternCounts[cutLen]);
       }
-      row++;
     }
     Astart.push_back(Aindex.size());
   }
 
-  int row = 0;
-  for (const auto &[cutLen, demand] : cutDemand) {
-    model.lp_.row_lower_[row] = demand;
-    model.lp_.row_upper_[row] = demand; // Enforces exact quantity
-    row++;
+  for (size_t i = 0; i < uniqueCutKeys.size(); ++i) {
+    model.lp_.row_lower_[i] = cutDemand[uniqueCutKeys[i]];
+    model.lp_.row_upper_[i] =
+        cutDemand[uniqueCutKeys[i]]; // Enforce exact quantity
   }
 
-  // Assign the matrix to the model
   model.lp_.a_matrix_.format_ = MatrixFormat::kColwise;
   model.lp_.a_matrix_.start_ = Astart;
   model.lp_.a_matrix_.index_ = Aindex;
   model.lp_.a_matrix_.value_ = Avalue;
-
-  // Set the objective sense to minimization
   model.lp_.sense_ = ObjSense::kMinimize;
 
   // Step 3: Solve the MIP model with HiGHS
   highs.passModel(model);
-  highs.setOptionValue("presolve", "on");
-  highs.setOptionValue("mip_rel_gap", 0.0);
-
   HighsStatus status = highs.run();
 
-  // If no solution is found, it might be impossible to create the exact
-  // quantities. This can happen with certain combinations of cuts and stock
-  // length.
-  if (status != HighsStatus::kOk) {
-    std::cerr << "HiGHS solve error: "
+  if (highs.getModelStatus() != HighsModelStatus::kOptimal) {
+    std::cerr << "HiGHS could not find an optimal solution. Status: "
               << highs.modelStatusToString(highs.getModelStatus()) << std::endl;
-    std::cerr << "It might be impossible to generate the exact number of "
-                 "requested parts with the given stock length."
-              << std::endl;
     return Solution();
   }
 
+  // Step 4: Convert the solver output, scaling back to doubles
   const HighsSolution &solution = highs.getSolution();
-
-  // Step 4: Convert the solver output into our domain-specific structs
   Solution result;
   double totalUsedLengthPrecise = 0.0;
 
@@ -128,93 +126,76 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, int stockLen,
     if (numSticks == 0)
       continue;
 
-    // For each stick of this pattern, calculate its properties
-    std::vector<Cut> cutSlice;
+    const auto &pattern = patterns[i];
     double preciseUsedLen = 0.0;
 
-    for (int cl : patterns[i]) {
-      cutSlice.push_back(Cut(cl, 0));
-      preciseUsedLen += cl;
+    std::vector<Cut> cutSlice;
+    for (long long scaled_len : pattern) {
+      double len = static_cast<double>(scaled_len) / PRECISION_SCALE;
+      cutSlice.push_back(Cut(len, 0));
+      preciseUsedLen += len;
     }
-
-    // Correctly account for kerf for EACH cut in the pattern
     preciseUsedLen += cutSlice.size() * kerf;
-    int usedLen = static_cast<int>(std::round(preciseUsedLen));
 
-    // Create stick objects for the solution
     for (int s = 0; s < numSticks; s++) {
       Stick stick;
       stick.cuts = cutSlice;
       stick.stock_len = stockLen;
-      stick.used_len = usedLen;
-      stick.waste_len = stockLen - usedLen;
+      stick.used_len = preciseUsedLen;
+      stick.waste_len = stockLen - preciseUsedLen;
       result.sticks.push_back(stick);
     }
-
     totalUsedLengthPrecise += preciseUsedLen * numSticks;
   }
 
   result.num_sticks = result.sticks.size();
-  result.total_waste = static_cast<int>(
-      std::round(result.num_sticks * stockLen - totalUsedLengthPrecise));
+  result.total_waste = result.num_sticks * stockLen - totalUsedLengthPrecise;
 
   return result;
 }
 
 /**
- * @brief Generates all possible unique cutting patterns for a single stick.
+ * @brief Generates all possible cutting patterns using scaled integers.
  *
  * This function recursively finds all combinations of cuts that can fit onto a
- * single stock piece, correctly accounting for kerf with each cut.
- *
- * @param availableCuts A list of all cut lengths that are needed.
- * @param stockLen The length of the stock material.
- * @param kerf The width of the saw blade.
- * @return A vector of patterns, where each pattern is a vector of cut lengths.
+ * single stock piece. Unlike the previous version, this generates ALL valid
+ * patterns, not just the maximal ones, giving the solver more options.
  */
-std::vector<std::vector<int>>
-generatePatterns(const std::vector<int> &availableCuts, int stockLen,
-                 double kerf) {
-  // Get unique cut lengths and sort them descending. This is a heuristic to
-  // find patterns with larger pieces first, which can be more efficient.
-  std::set<int> uniqueCutsSet(availableCuts.begin(), availableCuts.end());
-  std::vector<int> uniqueCuts(uniqueCutsSet.begin(), uniqueCutsSet.end());
+static std::vector<std::vector<long long>>
+generatePatterns(const std::vector<long long> &availableCuts,
+                 long long stockLen, long long kerf) {
+  std::set<long long> uniqueCutsSet(availableCuts.begin(), availableCuts.end());
+  std::vector<long long> uniqueCuts(uniqueCutsSet.begin(), uniqueCutsSet.end());
   std::sort(uniqueCuts.rbegin(), uniqueCuts.rend());
 
-  std::vector<std::vector<int>> patterns;
-  std::vector<int> currentPattern;
+  std::vector<std::vector<long long>> patterns;
+  std::vector<long long> currentPattern;
 
-  // We use `double` for remaining length to handle fractional kerf precisely.
-  std::function<void(int, double)> findPatterns = [&](int startIndex,
-                                                      double remainingLen) {
-    bool canAddMore = false;
-    // Try adding more cuts, starting from `startIndex` to generate combinations
-    // instead of permutations.
-    for (int i = startIndex; i < static_cast<int>(uniqueCuts.size()); i++) {
-      double cutLength = static_cast<double>(uniqueCuts[i]);
+  std::function<void(int, long long)> findPatterns =
+      [&](int startIndex, long long remainingLen) {
+        // Add the current combination as a valid pattern *before* trying to add
+        // more
+        if (!currentPattern.empty()) {
+          patterns.push_back(currentPattern);
+        }
 
-      // A cut consumes the length of the piece PLUS the blade's kerf.
-      if (remainingLen >= cutLength + kerf) {
-        canAddMore = true;
-        currentPattern.push_back(uniqueCuts[i]);
-        findPatterns(i, remainingLen - (cutLength + kerf));
-        currentPattern.pop_back(); // Backtrack for the next combination
-      }
-    }
-
-    // If no more pieces can be added from the current state, this path is
-    // complete. If the pattern is not empty, it's a valid maximal pattern.
-    if (!canAddMore && !currentPattern.empty()) {
-      patterns.push_back(currentPattern);
-    }
-  };
+        // Try adding more cuts, starting from `startIndex` to avoid
+        // permutations
+        for (size_t i = startIndex; i < uniqueCuts.size(); i++) {
+          long long cutLength = uniqueCuts[i];
+          // A cut consumes the length of the piece PLUS the blade's kerf
+          if (remainingLen >= cutLength + kerf) {
+            currentPattern.push_back(cutLength);
+            findPatterns(i, remainingLen - (cutLength + kerf));
+            currentPattern.pop_back(); // Backtrack for the next combination
+          }
+        }
+      };
 
   // Initial call to start the recursion.
-  findPatterns(0, static_cast<double>(stockLen));
+  findPatterns(0, stockLen);
 
-  // The recursive search might produce the same set of cuts from different
-  // paths. To ensure the final list is unique, we sort each pattern
-  // internally, then sort the list of patterns and remove duplicates.
+  // Remove duplicate patterns
   for (auto &p : patterns) {
     std::sort(p.begin(), p.end());
   }
