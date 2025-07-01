@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tube Designer - Optimize Your Cuts</title>
+    <style>
+        :root {
+            --primary: #0A3D62;
+            --primary-light: #3C6382;
+            --accent: #F39C12;
+            --success: #27AE60;
+            --danger: #E74C3C;
+            --dark: #2C3E50;
+            --light: #ECF0F1;
+            --gray: #95A5A6;
+            --white: #FFFFFF;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: var(--white);
+            box-shadow: var(--shadow);
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            color: var(--gray);
+            font-size: 1.2em;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        .card h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: var(--radius);
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .help-text {
+            font-size: 0.9em;
+            color: var(--gray);
+            margin-top: 5px;
+        }
+
+        .cuts-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--radius);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .cut-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: var(--radius);
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .cut-length {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .cut-quantity {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .remove-cut {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .remove-cut:hover {
+            background: #c0392b;
+        }
+
+        .add-cut-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .add-cut-form input {
+            flex: 1;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(10, 61, 98, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-accent:hover {
+            background: #E67E22;
+        }
+
+        #optimizeBtn {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #results {
+            display: none;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 20px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .pattern-visual {
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: var(--radius);
+            height: 50px;
+            display: flex;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .cut-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+            border-right: 2px solid white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .waste-segment {
+            background: repeating-linear-gradient(
+                45deg,
+                #e0e0e0,
+                #e0e0e0 10px,
+                #d0d0d0 10px,
+                #d0d0d0 20px
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .color-1 { background: #1f77b4; }
+        .color-2 { background: #ff7f0e; }
+        .color-3 { background: #2ca02c; }
+        .color-4 { background: #d62728; }
+        .color-5 { background: #9467bd; }
+        .color-6 { background: #8c564b; }
+
+        .error {
+            background: #fee;
+            color: var(--danger);
+            padding: 15px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--gray);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔧 Tube Designer</h1>
+        <p class="tagline">Optimize your tube cutting with advanced algorithms</p>
+    </header>
+
+    <div class="container">
+        <div class="main-grid">
+            <div class="card">
+                <h2>
+                    <svg class="icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Project Settings
+                </h2>
+                
+                <div class="form-group">
+                    <label for="jobName">Job Name</label>
+                    <input type="text" id="jobName" placeholder="My Project" value="Cut Plan">
+                </div>
+
+                <div class="form-group">
+                    <label for="tubing">Tubing Type</label>
+                    <input type="text" id="tubing" placeholder="e.g., 2x2, 1x1" value="2x2">
+                    <p class="help-text">Describe your material (e.g., 2x2 steel tube)</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="stockLength">Stock Length</label>
+                    <input type="text" id="stockLength" placeholder="e.g., 24' or 288" value="24'">
+                    <p class="help-text">Enter as feet (24'), inches (288), or feet+inches (20' 6")</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="kerf">Kerf Width (Blade Thickness)</label>
+                    <input type="text" id="kerf" placeholder="e.g., 1/8 or 0.125" value="1/8">
+                    <p class="help-text">Thickness of your cutting blade</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    Cut List
+                </h2>
+
+                <div class="cuts-container" id="cutsList">
+                    <!-- Cuts will be added here dynamically -->
+                </div>
+
+                <div class="add-cut-form">
+                    <input type="text" id="cutLength" placeholder="Length (e.g., 7'6)">
+                    <input type="number" id="cutQuantity" placeholder="Qty" min="1" value="1">
+                    <button class="btn btn-success" onclick="addCut()">+ Add</button>
+                </div>
+
+                <button id="optimizeBtn" class="btn btn-primary" onclick="optimize()">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Optimize Cuts
+                </button>
+            </div>
+        </div>
+
+        <div class="error" id="errorMsg"></div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Optimizing your cuts...</p>
+        </div>
+
+        <div id="results" class="card">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <footer>
+        <p>Powered by HiGHS optimization solver | Built with ❤️ for makers</p>
+    </footer>
+
+    <script>
+        let cuts = [];
+
+        function addCut() {
+            const lengthInput = document.getElementById('cutLength');
+            const quantityInput = document.getElementById('cutQuantity');
+            
+            const length = lengthInput.value.trim();
+            const quantity = parseInt(quantityInput.value) || 1;
+            
+            if (!length) {
+                showError('Please enter a cut length');
+                return;
+            }
+            
+            cuts.push({ length, quantity });
+            renderCuts();
+            
+            lengthInput.value = '';
+            quantityInput.value = '1';
+            lengthInput.focus();
+        }
+
+        function removeCut(index) {
+            cuts.splice(index, 1);
+            renderCuts();
+        }
+
+        function renderCuts() {
+            const container = document.getElementById('cutsList');
+            if (cuts.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999;">No cuts added yet</p>';
+                return;
+            }
+            
+            container.innerHTML = cuts.map((cut, index) => `
+                <div class="cut-item">
+                    <span class="cut-length">${cut.length}</span>
+                    <span class="cut-quantity">${cut.quantity}×</span>
+                    <button class="remove-cut" onclick="removeCut(${index})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function optimize() {
+            if (cuts.length === 0) {
+                showError('Please add at least one cut');
+                return;
+            }
+            
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            
+            const data = {
+                jobName: document.getElementById('jobName').value || 'Cut Plan',
+                tubing: document.getElementById('tubing').value || '2x2',
+                stockLength: document.getElementById('stockLength').value,
+                kerf: document.getElementById('kerf').value,
+                cuts: cuts
+            };
+            
+            try {
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Optimization failed');
+                }
+                
+                displayResults(result);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            const solution = data.solution;
+            
+            let html = `
+                <h2>📊 Optimization Results</h2>
+                
+                <div class="summary-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${solution.num_sticks}</div>
+                        <div class="stat-label">Sticks Needed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${solution.efficiency.toFixed(1)}%</div>
+                        <div class="stat-label">Efficiency</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.stockLengthPretty}</div>
+                        <div class="stat-label">Stock Length</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.optimizationTime.toFixed(2)}s</div>
+                        <div class="stat-label">Calc Time</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 30px; color: var(--primary);">Cut Patterns</h3>
+            `;
+            
+            let colorIndex = 1;
+            const colorMap = {};
+            
+            solution.patterns.forEach((pattern, i) => {
+                html += `<div style="margin-bottom: 20px;">`;
+                html += `<p><strong>${pattern.count}× Sticks</strong> (Waste: ${prettyLen(pattern.waste_len)})</p>`;
+                html += `<div class="pattern-visual">`;
+                
+                pattern.cuts.forEach(cut => {
+                    const key = cut.length.toFixed(4);
+                    if (!colorMap[key]) {
+                        colorMap[key] = colorIndex++;
+                        if (colorIndex > 6) colorIndex = 1;
+                    }
+                    const width = (cut.length / data.stockLength) * 100;
+                    html += `<div class="cut-segment color-${colorMap[key]}" style="width: ${width}%">${cut.pretty_length}</div>`;
+                });
+                
+                if (pattern.waste_len > 0.01) {
+                    const wasteWidth = (pattern.waste_len / data.stockLength) * 100;
+                    html += `<div class="waste-segment" style="width: ${wasteWidth}%">waste</div>`;
+                }
+                
+                html += `</div></div>`;
+            });
+            
+            html += `<button class="btn btn-accent" onclick="generateReport()" style="margin-top: 20px;">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/>
+                </svg>
+                Generate Print Report
+            </button>`;
+            
+            results.innerHTML = html;
+            results.style.display = 'block';
+            results.scrollIntoView({ behavior: 'smooth' });
+            
+            // Store result for report generation
+            window.lastResult = data;
+        }
+
+        function prettyLen(inches) {
+            if (Math.abs(inches) < 0.01) return '0"';
+            
+            const feet = Math.floor(inches / 12);
+            const remaining = inches - (feet * 12);
+            const wholeInches = Math.floor(remaining);
+            const fraction = remaining - wholeInches;
+            
+            let result = '';
+            if (feet > 0) result += feet + "'";
+            if (feet > 0 && (wholeInches > 0 || fraction > 0.01)) result += " ";
+            if (wholeInches > 0) result += wholeInches;
+            
+            if (fraction > 0.01) {
+                const denominators = [2, 4, 8, 16, 32];
+                for (const d of denominators) {
+                    const n = Math.round(fraction * d);
+                    if (Math.abs(fraction - n/d) < 0.01) {
+                        if (wholeInches > 0) result += " ";
+                        result += n + "/" + d;
+                        break;
+                    }
+                }
+            }
+            
+            if (result && (wholeInches > 0 || fraction > 0.01 || feet === 0)) result += '"';
+            return result || '0"';
+        }
+
+        async function generateReport() {
+            if (!window.lastResult) return;
+            
+            // Generate a downloadable HTML report
+            const result = window.lastResult;
+            const solution = result.solution;
+            
+            // Create HTML content for the report
+            let reportHTML = `<!DOCTYPE html>
+<html>
+<head>
+    <title>${result.jobName} - ${result.tubing}</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        h1 { color: #0A3D62; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f0f0f0; }
+        .pattern-bar { height: 40px; background: #f0f0f0; display: flex; border: 1px solid #ccc; margin: 10px 0; }
+        .cut { display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .waste { background: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #d0d0d0 10px, #d0d0d0 20px); }
+        @media print { body { max-width: 100%; } }
+    </style>
+</head>
+<body>
+    <h1>${result.jobName}</h1>
+    <p><strong>Material:</strong> ${result.tubing} @ ${result.stockLengthPretty}</p>
+    <p><strong>Kerf:</strong> ${result.kerfPretty}"</p>
+    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+    
+    <h2>Summary</h2>
+    <table>
+        <tr><td>Sticks Needed</td><td>${solution.num_sticks}</td></tr>
+        <tr><td>Efficiency</td><td>${solution.efficiency.toFixed(1)}%</td></tr>
+        <tr><td>Total Waste</td><td>${prettyLen(solution.total_waste)}</td></tr>
+    </table>
+    
+    <h2>Cut Patterns</h2>
+    <table>
+        <tr><th>Qty</th><th>Pattern</th><th>Waste</th></tr>`;
+            
+            solution.patterns.forEach(pattern => {
+                reportHTML += `<tr><td>${pattern.count}</td><td>`;
+                pattern.cuts.forEach(cut => {
+                    reportHTML += `${cut.pretty_length} `;
+                });
+                reportHTML += `</td><td>${prettyLen(pattern.waste_len)}</td></tr>`;
+            });
+            
+            reportHTML += `</table></body></html>`;
+            
+            // Create blob and download
+            const blob = new Blob([reportHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${result.jobName.replace(/[^a-z0-9]/gi, '_')}_cut_plan.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize
+        renderCuts();
+        
+        // Add enter key support
+        document.getElementById('cutLength').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addCut();
+        });
+        document.getElementById('cutQuantity').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addCut();
+        });
+    </script>
+</body>
+</html>

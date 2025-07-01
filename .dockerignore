@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+*.o
+*.obj
+bin/
+build/
+tube-designer
+tube-designer.exe
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+README.md
+*.md
+
+# Scripts (except necessary ones)
+*.sh
+!build.sh
+
+# Nix files (not needed in Docker)
+shell.nix
+.envrc
+
+# Test files
+test/
+tests/
+
+# macOS
+.DS_Store
+
+# Output files from old version
+cut_plan.html
