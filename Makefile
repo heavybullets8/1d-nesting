@@ -11,8 +11,8 @@ CXX = g++
 TARGET_DIR = bin
 TARGET = $(TARGET_DIR)/tube-designer
 
-# Source files
-SRCS = main.cpp parse.cpp algorithm.cpp output.cpp
+# Source files are in src/
+SRCS = $(wildcard src/*.cpp)
 
 # Object files (derived from source files)
 OBJS = $(SRCS:.cpp=.o)
@@ -41,7 +41,7 @@ endif
 CXXFLAGS = -m64 -std=c++17 -Wall -Wextra -O3 -DNDEBUG -Wno-reorder -Wno-unused-parameter
 
 # Include directory for header files (e.g., highs/Highs.h)
-INCLUDES = -I$(HIGHS_INSTALL_PATH)/include/highs
+INCLUDES = -I$(HIGHS_INSTALL_PATH)/include/highs -Iinclude
 
 # Linker flags for linking against the HiGHS library
 LDFLAGS = -L$(HIGHS_INSTALL_PATH)/lib -lhighs

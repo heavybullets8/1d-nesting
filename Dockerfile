@@ -26,7 +26,8 @@ RUN git clone https://github.com/ERGO-Code/HiGHS.git && \
 
 # Copy application source
 WORKDIR /app
-COPY *.cpp *.h ./
+COPY src/*.cpp ./src/
+COPY include/*.h ./include/
 
 # Download single-header libraries directly where we need them
 RUN wget -O httplib.h https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h && \
@@ -34,9 +35,9 @@ RUN wget -O httplib.h https://raw.githubusercontent.com/yhirose/cpp-httplib/mast
 
 # Build the web application
 RUN g++ -std=c++17 -O3 -DNDEBUG \
-  -I. \
+  -Iinclude \
   -I/usr/local/include/highs \
-  web_server.cpp parse.cpp algorithm.cpp output.cpp \
+  src/web_server.cpp src/parse.cpp src/algorithm.cpp src/output.cpp \
   -o tube-designer-server \
   -L/usr/local/lib -lhighs \
   -lpthread
