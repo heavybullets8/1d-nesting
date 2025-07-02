@@ -20,8 +20,9 @@ if command_exists docker-compose; then
   # Make sure static directory exists
   mkdir -p static
 
-  # Stop any existing containers
-  docker-compose down 2>/dev/null
+  # Stop any existing containers and remove them
+  echo "Stopping and removing existing Docker Compose services (if any)..."
+  docker-compose down --remove-orphans 2>/dev/null || true # Use '|| true' to prevent script from exiting if no services are running
 
   # Start with docker-compose
   docker-compose up --build
@@ -30,21 +31,31 @@ elif command_exists docker; then
   echo "✅ Docker found. Building and starting..."
   echo ""
 
+  # Stop and remove existing container if it exists
+  CONTAINER_NAME="tube-designer"
+  if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Stopping and removing existing container: ${CONTAINER_NAME}..."
+    docker stop ${CONTAINER_NAME} >/dev/null || true
+    docker rm ${CONTAINER_NAME} >/dev/null || true
+  fi
+
   # Build the image
+  echo "Building Docker image 'tube-designer'..."
   docker build -t tube-designer .
 
   # Run the container
-  docker run -d -p 8080:8080 --name tube-designer tube-designer
+  echo "Running new container: ${CONTAINER_NAME}..."
+  docker run -d -p 8080:8080 --name ${CONTAINER_NAME} tube-designer
 
   echo ""
   echo "✨ Application started!"
   echo "📱 Open http://localhost:8080 in your browser"
   echo ""
-  echo "To view logs: docker logs -f tube-designer"
-  echo "To stop: docker stop tube-designer && docker rm tube-designer"
+  echo "To view logs: docker logs -f ${CONTAINER_NAME}"
+  echo "To stop: docker stop ${CONTAINER_NAME} && docker rm ${CONTAINER_NAME}"
 
 else
-  echo "⚠️  Docker not found. Attempting local build..."
+  echo "⚠️  Neither Docker nor Make found. Attempting local build..."
 
   if command_exists make; then
     # Try to build with make

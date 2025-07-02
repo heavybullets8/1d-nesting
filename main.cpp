@@ -187,14 +187,12 @@ int main(int argc, char *argv[]) {
   std::cout << "Optimization finished in " << duration.count() / 1000.0
             << " seconds.\n";
 
-  // 6. Print results
+  // 6. Print results (to console)
   if (solution.num_sticks > 0) {
     printResults(jobName, tubing, stockIn, kerfIn, cuts, solution);
 
-    // 7. Generate HTML
-    std::string htmlFile = "cut_plan.html";
-    generateHTML(htmlFile, jobName, tubing, stockIn, kerfIn, cuts, solution);
-    openFile(htmlFile);
+    // Removed HTML generation and file opening as per user request.
+    // The web interface now handles printing directly.
   }
 
   return 0;

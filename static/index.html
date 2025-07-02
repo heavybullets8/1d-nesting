@@ -1,21 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tube Designer - Optimize Your Cuts</title>
     <style>
         :root {
-            --primary: #0A3D62;
-            --primary-light: #3C6382;
-            --accent: #F39C12;
-            --success: #27AE60;
-            --danger: #E74C3C;
-            --dark: #2C3E50;
-            --light: #ECF0F1;
-            --gray: #95A5A6;
-            --white: #FFFFFF;
-            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --primary: #0a3d62;
+            --primary-light: #3c6382;
+            --accent: #f39c12;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --gray: #95a5a6;
+            --white: #ffffff;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             --radius: 8px;
         }
 
@@ -26,7 +26,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
             color: var(--dark);
@@ -230,7 +230,7 @@
         }
 
         .btn-accent:hover {
-            background: #E67E22;
+            background: #e67e22;
         }
 
         #optimizeBtn {
@@ -255,12 +255,55 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         #results {
             display: none;
+            margin-top: 40px;
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 30px;
+        }
+
+        #results h2 {
+            color: var(--primary);
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 5px;
+        }
+        #results h3 {
+            color: var(--primary);
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .report-header h1 {
+            font-size: 1.8em;
+            margin: 0;
+            color: var(--primary);
+            border-bottom: none;
+        }
+        .report-header p {
+            margin: 0;
+            text-align: right;
+            font-size: 0.9em;
+            color: var(--dark);
         }
 
         .summary-grid {
@@ -289,9 +332,81 @@
             opacity: 0.9;
         }
 
+        .required-cuts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .required-cut-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--radius);
+            padding: 10px 15px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .required-cut-qty {
+            font-weight: bold;
+            color: var(--primary);
+            flex-shrink: 0;
+            width: 40px;
+            text-align: center;
+        }
+
+        .required-cut-details {
+            flex-grow: 1;
+        }
+
+        .required-cut-details span {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .required-cut-bar {
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85em;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            padding: 0 8px;
+            box-sizing: border-box;
+        }
+
+        .required-cut-bar.color-1 {
+            background-color: #1f77b4;
+        }
+        .required-cut-bar.color-2 {
+            background-color: #ff7f0e;
+        }
+        .required-cut-bar.color-3 {
+            background-color: #2ca02c;
+        }
+        .required-cut-bar.color-4 {
+            background-color: #d62728;
+        }
+        .required-cut-bar.color-5 {
+            background-color: #9467bd;
+        }
+        .required-cut-bar.color-6 {
+            background-color: #8c564b;
+        }
+
         .pattern-visual {
             background: #f0f0f0;
-            border: 2px solid #ddd;
+            border: 1px solid #ccc;
             border-radius: var(--radius);
             height: 50px;
             display: flex;
@@ -299,7 +414,8 @@
             margin: 10px 0;
         }
 
-        .cut-segment {
+        .cut-segment,
+        .waste-segment {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -307,30 +423,41 @@
             font-weight: bold;
             font-size: 0.9em;
             border-right: 2px solid white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pattern-visual .cut-segment:last-child {
+            border-right: none;
         }
 
         .waste-segment {
-            background: repeating-linear-gradient(
-                45deg,
-                #e0e0e0,
-                #e0e0e0 10px,
-                #d0d0d0 10px,
-                #d0d0d0 20px
-            );
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #d0d0d0 10px, #d0d0d0 20px);
             color: #666;
             font-size: 0.8em;
+            text-shadow: none;
         }
 
-        .color-1 { background: #1f77b4; }
-        .color-2 { background: #ff7f0e; }
-        .color-3 { background: #2ca02c; }
-        .color-4 { background: #d62728; }
-        .color-5 { background: #9467bd; }
-        .color-6 { background: #8c564b; }
+        .color-1 {
+            background: #1f77b4;
+        }
+        .color-2 {
+            background: #ff7f0e;
+        }
+        .color-3 {
+            background: #2ca02c;
+        }
+        .color-4 {
+            background-color: #d62728;
+        }
+        .color-5 {
+            background-color: #9467bd;
+        }
+        .color-6 {
+            background-color: #8c564b;
+        }
 
         .error {
             background: #fee;
@@ -345,6 +472,155 @@
             text-align: center;
             padding: 40px 0;
             color: var(--gray);
+        }
+
+        /* ----------- PRINT STYLES ----------- */
+        @media print {
+            /* Reset margins and let @page control them to prevent extra blank pages */
+            @page {
+                margin: 0.5in;
+            }
+
+            html,
+            body {
+                background: none;
+                color: #000;
+                margin: 0; /* Reset margins in print mode */
+                padding: 0;
+                max-width: none;
+                font-size: 10pt;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* Hide UI controls and non‑essential elements */
+            header,
+            .main-grid,
+            footer,
+            .btn,
+            #errorMsg,
+            #loading,
+            .help-text,
+            .add-cut-form,
+            .remove-cut,
+            .cuts-container {
+                display: none !important;
+            }
+
+            .container {
+                padding: 0 !important;
+            }
+
+            /* Primary printable section */
+            #results {
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                background: #fff !important;
+                width: 100%;
+                border: none !important;
+                page-break-after: avoid;
+            }
+
+            .card {
+                box-shadow: none !important;
+                padding: 0 !important;
+                border-radius: 0 !important;
+                background: #fff !important;
+            }
+
+            h1,
+            h2,
+            h3 {
+                color: #000 !important;
+                border-bottom: 1px solid #ccc !important;
+                padding-bottom: 5px;
+                margin-top: 15px !important;
+                page-break-after: avoid;
+            }
+
+            /* Header inside the report */
+            .report-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                border-bottom: 3px solid #000;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+            }
+            .report-header h1 {
+                font-size: 1.8em;
+                margin: 0;
+                border-bottom: none !important;
+            }
+            .report-header p {
+                margin: 0;
+                text-align: right;
+                font-size: 0.9em;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+                gap: 10px;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
+            }
+
+            .stat-card {
+                background: #f0f0f0 !important;
+                color: #333 !important;
+                border: 1px solid #ddd;
+                padding: 10px;
+                border-radius: 5px;
+            }
+
+            .stat-value {
+                font-size: 1.5em;
+            }
+
+            .stat-label {
+                font-size: 0.8em;
+            }
+
+            /* Required Cuts visuals */
+            .required-cuts-list {
+                gap: 8px;
+                page-break-inside: avoid;
+            }
+            .required-cut-item {
+                background: #fff;
+                border: 1px solid #eee;
+                box-shadow: none;
+                padding: 6px 8px;
+            }
+            .required-cut-qty {
+                font-size: 0.8em;
+                width: 35px;
+            }
+            .required-cut-details span {
+                font-size: 0.8em;
+            }
+            .required-cut-bar {
+                height: 25px;
+                font-size: 0.65em;
+                padding: 0 5px;
+            }
+
+            .pattern-visual {
+                height: 30px;
+                margin: 5px 0;
+            }
+
+            .cut-segment,
+            .waste-segment {
+                font-size: 0.7em;
+                border-right: 1px solid #fff;
+            }
+            .cut-segment:last-child {
+                border-right: none;
+            }
         }
     </style>
 </head>
@@ -423,7 +699,7 @@
         </div>
 
         <div id="results" class="card">
-            <!-- Results will be populated here -->
+            <!-- Results will be populated here by JavaScript -->
         </div>
     </div>
 
@@ -433,6 +709,19 @@
 
     <script>
         let cuts = [];
+        // Global color map for consistent coloring across required cuts and patterns
+        const globalColorMap = {};
+        let nextColorIndex = 1;
+
+        function getCutColorClass(cutLength) {
+            const key = cutLength.toFixed(4); // Use fixed precision for consistent key
+            if (!globalColorMap[key]) {
+                globalColorMap[key] = `color-${nextColorIndex++}`;
+                if (nextColorIndex > 6) nextColorIndex = 1; // Cycle through 6 colors
+            }
+            return globalColorMap[key];
+        }
+
 
         function addCut() {
             const lengthInput = document.getElementById('cutLength');
@@ -528,9 +817,36 @@
         function displayResults(data) {
             const results = document.getElementById('results');
             const solution = data.solution;
+            const currentDate = new Date().toLocaleDateString();
             
             let html = `
-                <h2>📊 Optimization Results</h2>
+                <div class="report-header">
+                    <h1>${data.jobName}</h1>
+                    <p>
+                        <strong>Material:</strong> ${data.tubing}<br>
+                        <strong>Stock Length:</strong> ${data.stockLengthPretty}<br>
+                        <strong>Kerf:</strong> ${data.kerfPretty}"<br>
+                        <strong>Date:</strong> ${currentDate}
+                    </p>
+                </div>
+
+                <h2>Required Cuts</h2>
+                <div class="required-cuts-list">
+                    ${data.cutsSummary.map(cut => {
+                        const cutWidthPercent = (cut.length / data.stockLength) * 100;
+                        const colorClass = getCutColorClass(cut.length);
+                        return `
+                            <div class="required-cut-item">
+                                <span class="required-cut-qty">${cut.quantity}×</span>
+                                <div class="required-cut-bar ${colorClass}" style="width: ${cutWidthPercent.toFixed(3)}%;">
+                                    ${cut.lengthPretty}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <h2>📊 Optimization Summary</h2>
                 
                 <div class="summary-grid">
                     <div class="stat-card">
@@ -542,8 +858,8 @@
                         <div class="stat-label">Efficiency</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value">${data.stockLengthPretty}</div>
-                        <div class="stat-label">Stock Length</div>
+                        <div class="stat-value">${prettyLen(solution.total_waste)}</div>
+                        <div class="stat-label">Total Waste</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">${data.optimizationTime.toFixed(2)}s</div>
@@ -551,11 +867,8 @@
                     </div>
                 </div>
                 
-                <h3 style="margin-top: 30px; color: var(--primary);">Cut Patterns</h3>
+                <h3>Cut Patterns</h3>
             `;
-            
-            let colorIndex = 1;
-            const colorMap = {};
             
             solution.patterns.forEach((pattern, i) => {
                 html += `<div style="margin-bottom: 20px;">`;
@@ -563,45 +876,41 @@
                 html += `<div class="pattern-visual">`;
                 
                 pattern.cuts.forEach(cut => {
-                    const key = cut.length.toFixed(4);
-                    if (!colorMap[key]) {
-                        colorMap[key] = colorIndex++;
-                        if (colorIndex > 6) colorIndex = 1;
-                    }
+                    const colorClass = getCutColorClass(cut.length); // Use global color map
                     const width = (cut.length / data.stockLength) * 100;
-                    html += `<div class="cut-segment color-${colorMap[key]}" style="width: ${width}%">${cut.pretty_length}</div>`;
+                    html += `<div class="cut-segment ${colorClass}" style="width: ${width.toFixed(3)}%;" title="${cut.pretty_length}">${cut.pretty_length}</div>`;
                 });
                 
                 if (pattern.waste_len > 0.01) {
                     const wasteWidth = (pattern.waste_len / data.stockLength) * 100;
-                    html += `<div class="waste-segment" style="width: ${wasteWidth}%">waste</div>`;
+                    html += `<div class="waste-segment" style="width: ${wasteWidth.toFixed(3)}%;" title="Waste: ${prettyLen(pattern.waste_len)}">waste</div>`;
                 }
                 
                 html += `</div></div>`;
             });
             
-            html += `<button class="btn btn-accent" onclick="generateReport()" style="margin-top: 20px;">
+            html += `<button class="btn btn-accent" onclick="printResultsReport()" style="margin-top: 20px;">
                 <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/>
                 </svg>
-                Generate Print Report
+                Print Results
             </button>`;
             
             results.innerHTML = html;
             results.style.display = 'block';
             results.scrollIntoView({ behavior: 'smooth' });
-            
-            // Store result for report generation
-            window.lastResult = data;
         }
 
         function prettyLen(inches) {
             if (Math.abs(inches) < 0.01) return '0"';
             
-            const feet = Math.floor(inches / 12);
-            const remaining = inches - (feet * 12);
-            const wholeInches = Math.floor(remaining);
-            const fraction = remaining - wholeInches;
+            // Round to the nearest 1/32 for clean display
+            inches = Math.round(inches * 32.0) / 32.0;
+
+            let feet = Math.floor(inches / 12);
+            let remaining = inches - (feet * 12);
+            let wholeInches = Math.floor(remaining);
+            let fraction = remaining - wholeInches;
             
             let result = '';
             if (feet > 0) result += feet + "'";
@@ -609,80 +918,30 @@
             if (wholeInches > 0) result += wholeInches;
             
             if (fraction > 0.01) {
-                const denominators = [2, 4, 8, 16, 32];
+                // Simplified fraction logic for display
+                const tolerance = 1.0 / 64.0; // Check up to 1/64th
+                const denominators = [2, 4, 8, 16, 32, 64];
+
                 for (const d of denominators) {
                     const n = Math.round(fraction * d);
-                    if (Math.abs(fraction - n/d) < 0.01) {
+                    if (Math.abs(fraction - n / d) < tolerance) {
+                        // Simplify fraction: find GCD
+                        let commonDivisor = function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }(n, d);
                         if (wholeInches > 0) result += " ";
-                        result += n + "/" + d;
+                        result += (n / commonDivisor) + "/" + (d / commonDivisor);
                         break;
                     }
                 }
             }
             
+            // Add inch symbol if there are inches or if it's just a fraction
             if (result && (wholeInches > 0 || fraction > 0.01 || feet === 0)) result += '"';
-            return result || '0"';
+            return result || '0"'; // Fallback for zero or very small values
         }
 
-        async function generateReport() {
-            if (!window.lastResult) return;
-            
-            // Generate a downloadable HTML report
-            const result = window.lastResult;
-            const solution = result.solution;
-            
-            // Create HTML content for the report
-            let reportHTML = `<!DOCTYPE html>
-<html>
-<head>
-    <title>${result.jobName} - ${result.tubing}</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
-        h1 { color: #0A3D62; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
-        th { background: #f0f0f0; }
-        .pattern-bar { height: 40px; background: #f0f0f0; display: flex; border: 1px solid #ccc; margin: 10px 0; }
-        .cut { display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
-        .waste { background: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #d0d0d0 10px, #d0d0d0 20px); }
-        @media print { body { max-width: 100%; } }
-    </style>
-</head>
-<body>
-    <h1>${result.jobName}</h1>
-    <p><strong>Material:</strong> ${result.tubing} @ ${result.stockLengthPretty}</p>
-    <p><strong>Kerf:</strong> ${result.kerfPretty}"</p>
-    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-    
-    <h2>Summary</h2>
-    <table>
-        <tr><td>Sticks Needed</td><td>${solution.num_sticks}</td></tr>
-        <tr><td>Efficiency</td><td>${solution.efficiency.toFixed(1)}%</td></tr>
-        <tr><td>Total Waste</td><td>${prettyLen(solution.total_waste)}</td></tr>
-    </table>
-    
-    <h2>Cut Patterns</h2>
-    <table>
-        <tr><th>Qty</th><th>Pattern</th><th>Waste</th></tr>`;
-            
-            solution.patterns.forEach(pattern => {
-                reportHTML += `<tr><td>${pattern.count}</td><td>`;
-                pattern.cuts.forEach(cut => {
-                    reportHTML += `${cut.pretty_length} `;
-                });
-                reportHTML += `</td><td>${prettyLen(pattern.waste_len)}</td></tr>`;
-            });
-            
-            reportHTML += `</table></body></html>`;
-            
-            // Create blob and download
-            const blob = new Blob([reportHTML], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${result.jobName.replace(/[^a-z0-9]/gi, '_')}_cut_plan.html`;
-            a.click();
-            URL.revokeObjectURL(url);
+        function printResultsReport() {
+            // Trigger the browser's print dialog
+            window.print();
         }
 
         // Initialize
