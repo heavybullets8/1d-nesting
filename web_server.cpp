@@ -1,10 +1,8 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <sstream>
 
-// Single header HTTP library - download from
 // https://github.com/yhirose/cpp-httplib
 #include "httplib.h"
 
@@ -107,7 +105,8 @@ int main() {
 
           // Extract parameters
           std::string jobName = body.value("jobName", "Cut Plan");
-          std::string tubing = body.value("tubing", "2x2");
+          std::string materialType =
+              body.value("materialType", "Standard Material");
           std::string stockLengthStr = body["stockLength"];
           std::string kerfStr = body["kerf"];
           auto cutsArray = body["cuts"];
@@ -177,7 +176,7 @@ int main() {
           // Prepare response
           json response;
           response["jobName"] = jobName;
-          response["tubing"] = tubing;
+          response["materialType"] = materialType;
           response["stockLength"] = stockLen;
           response["stockLengthPretty"] = prettyLen(stockLen);
           response["kerf"] = kerf;
@@ -211,7 +210,8 @@ int main() {
         }
       });
 
-  std::cout << "Tube Designer server starting on http://0.0.0.0:8080\n";
+  std::cout << "1D Nesting Software server starting on http://0.0.0.0:8080\n";
+  // name
   std::cout << "Press Ctrl+C to stop\n";
 
   if (!svr.listen("0.0.0.0", 8080)) {

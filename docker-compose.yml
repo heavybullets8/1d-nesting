@@ -1,11 +1,13 @@
 version: '3.8'
 
 services:
-  tube-designer:
+  # Renamed service to be more generic for 1D Nesting
+  one-d-nesting:
     build: .
     ports:
       - "8080:8080"
     volumes:
+      # Mount static directory for the web server
       - ./static:/app/static:ro
     environment:
       - NODE_ENV=production

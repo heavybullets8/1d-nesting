@@ -5,23 +5,12 @@
 #include <string>
 #include <vector>
 
-// Print results to console
-void printResults(const std::string &jobName, const std::string &tubing,
-                  double stockLen, double kerf, const std::vector<Cut> &cuts,
-                  const Solution &solution);
-
-// Generate HTML output file
-void generateHTML(const std::string &filename, const std::string &jobName,
-                  const std::string &tubing, double stockLen, double kerf,
-                  const std::vector<Cut> &cuts, const Solution &solution);
-
-// Group sticks into patterns for cleaner output
+// Group sticks into patterns for cleaner output.
+// This function is used by web_server.cpp to prepare data for the API response.
 std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks);
 
-// Open file in system's default browser
-void openFile(const std::string &filename);
-
-// Convert a decimal to a fraction string for display
+// Convert a decimal to a fraction string for display.
+// This function is used by web_server.cpp to prepare data for the API response.
 std::string toFraction(double value);
 
 #endif // OUTPUT_H

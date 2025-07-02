@@ -1,7 +1,6 @@
 #include "parse.h"
 #include <cmath>
-#include <iostream>
-#include <numeric>
+#include <iostream> // Keep for potential debug output, though not strictly for app logic
 #include <regex>
 #include <sstream>
 #include <string>
@@ -173,26 +172,4 @@ std::string prettyLen(double total_inches) {
   }
 
   return ss.str();
-}
-
-/**
- * @brief Gets a line of input from the user, with a prompt and default value.
- * @param prompt The prompt to display to the user.
- * @param defaultValue The value to return if the user enters nothing.
- * @return The user's input or the default value.
- */
-std::string getInput(const std::string &prompt,
-                     const std::string &defaultValue) {
-  std::cout << prompt << ": ";
-  std::string line;
-  std::getline(std::cin, line);
-
-  // Trim whitespace from user input
-  line.erase(0, line.find_first_not_of(" \t\n\r"));
-  line.erase(line.find_last_not_of(" \t\n\r") + 1);
-
-  if (line.empty()) {
-    return defaultValue;
-  }
-  return line;
 }

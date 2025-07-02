@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tube Designer - Optimize Your Cuts</title>
+    <title>1D Nesting Software - Optimize Your Cuts</title>
     <style>
         :root {
             --primary: #0a3d62;
@@ -626,8 +626,8 @@
 </head>
 <body>
     <header>
-        <h1>🔧 Tube Designer</h1>
-        <p class="tagline">Optimize your tube cutting with advanced algorithms</p>
+        <h1>📏 1D Nesting Software</h1>
+        <p class="tagline">Optimize your material cuts with advanced algorithms</p>
     </header>
 
     <div class="container">
@@ -646,9 +646,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="tubing">Tubing Type</label>
-                    <input type="text" id="tubing" placeholder="e.g., 2x2, 1x1" value="2x2">
-                    <p class="help-text">Describe your material (e.g., 2x2 steel tube)</p>
+                    <label for="materialType">Material Type</label>
+                    <input type="text" id="materialType" placeholder="e.g., Wood, Steel Bar, Fabric Roll" value="Standard Material">
+                    <p class="help-text">Describe your material (e.g., 2x4 wood, 1/2" steel bar)</p>
                 </div>
 
                 <div class="form-group">
@@ -658,9 +658,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="kerf">Kerf Width (Blade Thickness)</label>
+                    <label for="kerf">Kerf Width (Blade/Cut Thickness)</label>
                     <input type="text" id="kerf" placeholder="e.g., 1/8 or 0.125" value="1/8">
-                    <p class="help-text">Thickness of your cutting blade</p>
+                    <p class="help-text">Thickness of your cutting blade or material removal</p>
                 </div>
             </div>
 
@@ -787,7 +787,7 @@
             
             const data = {
                 jobName: document.getElementById('jobName').value || 'Cut Plan',
-                tubing: document.getElementById('tubing').value || '2x2',
+                materialType: document.getElementById('materialType').value || 'Standard Material',
                 stockLength: document.getElementById('stockLength').value,
                 kerf: document.getElementById('kerf').value,
                 cuts: cuts
@@ -823,7 +823,7 @@
                 <div class="report-header">
                     <h1>${data.jobName}</h1>
                     <p>
-                        <strong>Material:</strong> ${data.tubing}<br>
+                        <strong>Material Type:</strong> ${data.materialType}<br>
                         <strong>Stock Length:</strong> ${data.stockLengthPretty}<br>
                         <strong>Kerf:</strong> ${data.kerfPretty}"<br>
                         <strong>Date:</strong> ${currentDate}
@@ -851,7 +851,7 @@
                 <div class="summary-grid">
                     <div class="stat-card">
                         <div class="stat-value">${solution.num_sticks}</div>
-                        <div class="stat-label">Sticks Needed</div>
+                        <div class="stat-label">Stock Pieces Needed</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">${solution.efficiency.toFixed(1)}%</div>
@@ -872,7 +872,7 @@
             
             solution.patterns.forEach((pattern, i) => {
                 html += `<div style="margin-bottom: 20px;">`;
-                html += `<p><strong>${pattern.count}× Sticks</strong> (Waste: ${prettyLen(pattern.waste_len)})</p>`;
+                html += `<p><strong>${pattern.count}× Stock Pieces</strong> (Waste: ${prettyLen(pattern.waste_len)})</p>`;
                 html += `<div class="pattern-visual">`;
                 
                 pattern.cuts.forEach(cut => {
