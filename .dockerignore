@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+*.o
+*.obj
+bin/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+README.md
+*.md
+
+# Scripts (except necessary ones)
+*.sh
+
+# Nix files (not needed in Docker)
+shell.nix
+.envrc
+
+# Test files
+test/
+tests/
+
+# macOS
+.DS_Store
+
+# Output files from old version
+cut_plan.html
+
+# Docker directory itself (when building from parent)
+docker/
