@@ -1,0 +1,47 @@
+# Build directories and artifacts
+build/
+bin/
+*.o
+*.obj
+
+# Executable files
+tube-designer
+tube-designer.exe
+tube-designer-server
+
+# Downloaded single-header libraries
+include/httplib.h
+include/json.hpp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output files
+cut_plan.html
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# Dependencies
+deps/
+
+# CMake files (if you decide to use CMake later)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.cmake
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
