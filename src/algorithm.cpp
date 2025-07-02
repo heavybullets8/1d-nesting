@@ -44,7 +44,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
 
   // Step 2: Build the Mixed-Integer Programming (MIP) model using HiGHS
   Highs highs;
-  highs.setOptionValue("output_flag", true); // Keep solver output for now
+  highs.setOptionValue("output_flag", false);
   HighsModel model;
 
   // Create a map to track the demand for each unique cut length

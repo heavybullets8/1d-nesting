@@ -1,6 +1,9 @@
 #include <chrono>
+#include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <signal.h>
 #include <sstream>
 
 // Single-header libraries (will be downloaded to include/ directory)
@@ -15,11 +18,58 @@
 
 using json = nlohmann::json;
 
+httplib::Server *g_svr = nullptr;
+
+void signalHandler(int signum) {
+  if (g_svr) {
+    std::cout << "\n[INFO ] Shutting down server gracefully..." << std::endl;
+    g_svr->stop();
+  }
+}
+
+class Logger {
+public:
+  enum Level { DEBUG, INFO, WARN, ERROR };
+
+  static void log(Level level, const std::string &message) {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  now.time_since_epoch()) %
+              1000;
+
+    std::cout << std::put_time(std::localtime(&time_t), "[%Y-%m-%d %H:%M:%S");
+    std::cout << "." << std::setfill('0') << std::setw(3) << ms.count() << "] ";
+
+    switch (level) {
+    case DEBUG:
+      std::cout << "[DEBUG] ";
+      break;
+    case INFO:
+      std::cout << "[INFO ] ";
+      break;
+    case WARN:
+      std::cout << "[WARN ] ";
+      break;
+    case ERROR:
+      std::cout << "[ERROR] ";
+      break;
+    }
+
+    std::cout << message << std::endl;
+  }
+};
+
 // Read file content
 std::string readFile(const std::string &path) {
   std::ifstream file(path);
   if (!file.is_open()) {
-    return "";
+    // Try alternate path (useful for Docker deployments)
+    std::string altPath = "/app/" + path;
+    file.open(altPath);
+    if (!file.is_open()) {
+      return "";
+    }
   }
   std::stringstream buffer;
   buffer << file.rdbuf();
@@ -63,7 +113,35 @@ json solutionToJson(const Solution &solution, double stockLen, double kerf) {
 }
 
 int main() {
+  // Set up signal handling for graceful shutdown
+  signal(SIGINT, signalHandler);
+  signal(SIGTERM, signalHandler);
+
+  // Check for static files
+  std::string indexContent = readFile("static/index.html");
+  if (indexContent.empty()) {
+    Logger::log(Logger::WARN,
+                "static/index.html not found in current directory");
+    Logger::log(Logger::INFO,
+                "Will try /app/static/index.html when requests come in");
+  } else {
+    Logger::log(Logger::INFO, "Static files found in current directory");
+  }
+
   httplib::Server svr;
+  g_svr = &svr; // Store global reference for signal handler
+
+  // Set up request logging
+  svr.set_logger([](const httplib::Request &req, const httplib::Response &res) {
+    std::stringstream ss;
+    ss << req.method << " " << req.path << " - " << res.status;
+    ss << " - " << req.remote_addr << ":" << req.remote_port;
+    if (res.status >= 400) {
+      Logger::log(Logger::ERROR, ss.str());
+    } else {
+      Logger::log(Logger::INFO, ss.str());
+    }
+  });
 
   // Note: CORS headers will be set in each handler
 
@@ -71,12 +149,42 @@ int main() {
   svr.Get("/", [](const httplib::Request &req, httplib::Response &res) {
     std::string content = readFile("static/index.html");
     if (content.empty()) {
+      Logger::log(Logger::ERROR,
+                  "Failed to read static/index.html - file not found");
       res.status = 404;
-      res.set_content("index.html not found", "text/plain");
+      res.set_content("<h1>404 - File Not Found</h1><p>Could not find "
+                      "index.html. Please check your deployment.</p>",
+                      "text/html");
     } else {
       res.set_content(content, "text/html");
     }
   });
+
+  // Serve static files
+  svr.Get("/static/(.*)",
+          [](const httplib::Request &req, httplib::Response &res) {
+            std::string path = "static/" + req.matches[1].str();
+            std::string content = readFile(path);
+            if (content.empty()) {
+              Logger::log(Logger::WARN, "Static file not found: " + path);
+              res.status = 404;
+              res.set_content("File not found", "text/plain");
+            } else {
+              // Set appropriate content type based on extension
+              std::string ext = path.substr(path.find_last_of(".") + 1);
+              std::string content_type = "text/plain";
+              if (ext == "html")
+                content_type = "text/html";
+              else if (ext == "css")
+                content_type = "text/css";
+              else if (ext == "js")
+                content_type = "application/javascript";
+              else if (ext == "json")
+                content_type = "application/json";
+
+              res.set_content(content, content_type);
+            }
+          });
 
   // Health check endpoint
   svr.Get("/api/health",
@@ -94,128 +202,183 @@ int main() {
       });
 
   // Main optimization endpoint
-  svr.Post(
-      "/api/optimize", [](const httplib::Request &req, httplib::Response &res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Content-Type", "application/json");
+  svr.Post("/api/optimize", [](const httplib::Request &req,
+                               httplib::Response &res) {
+    res.set_header("Access-Control-Allow-Origin", "*");
+    res.set_header("Content-Type", "application/json");
 
-        try {
-          auto body = json::parse(req.body);
+    try {
+      Logger::log(Logger::DEBUG, "Parsing optimization request body");
+      auto body = json::parse(req.body);
 
-          // Extract parameters
-          std::string jobName = body.value("jobName", "Cut Plan");
-          std::string materialType =
-              body.value("materialType", "Standard Material");
-          std::string stockLengthStr = body["stockLength"];
-          std::string kerfStr = body["kerf"];
-          auto cutsArray = body["cuts"];
+      // Extract parameters
+      std::string jobName = body.value("jobName", "Cut Plan");
+      std::string materialType =
+          body.value("materialType", "Standard Material");
+      std::string stockLengthStr = body["stockLength"];
+      std::string kerfStr = body["kerf"];
+      auto cutsArray = body["cuts"];
 
-          // Parse stock length
-          double stockLen = parseAdvancedLength(stockLengthStr);
-          if (stockLen <= 0) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Invalid stock length\"}",
-                            "application/json");
-            return;
-          }
+      // Parse stock length
+      double stockLen = parseAdvancedLength(stockLengthStr);
+      if (stockLen <= 0) {
+        Logger::log(Logger::WARN, "Invalid stock length: " + stockLengthStr);
+        res.status = 400;
+        res.set_content("{\"error\":\"Invalid stock length\"}",
+                        "application/json");
+        return;
+      }
 
-          // Parse kerf
-          double kerf = parseFraction(kerfStr);
-          if (kerf <= 0) {
-            kerf = 0.125; // Default to 1/8"
-          }
+      // Parse kerf
+      double kerf = parseFraction(kerfStr);
+      if (kerf <= 0) {
+        kerf = 0.125; // Default to 1/8"
+        Logger::log(Logger::INFO, "Using default kerf: 1/8\"");
+      }
 
-          // Parse cuts
-          std::vector<Cut> cuts;
-          int cutID = 1;
+      // Parse cuts
+      std::vector<Cut> cuts;
+      int cutID = 1;
+      int totalCuts = 0;
 
-          for (const auto &cutItem : cutsArray) {
-            double length =
-                parseAdvancedLength(cutItem["length"].get<std::string>());
-            int quantity = cutItem["quantity"].get<int>();
+      for (const auto &cutItem : cutsArray) {
+        double length =
+            parseAdvancedLength(cutItem["length"].get<std::string>());
+        int quantity = cutItem["quantity"].get<int>();
 
-            if (length <= 0 || quantity <= 0) {
-              continue;
-            }
+        if (length <= 0 || quantity <= 0) {
+          Logger::log(Logger::WARN,
+                      "Skipping invalid cut: length=" + std::to_string(length) +
+                          ", qty=" + std::to_string(quantity));
+          continue;
+        }
 
-            if (length > stockLen) {
-              res.status = 400;
-              res.set_content("{\"error\":\"Cut length exceeds stock length\"}",
-                              "application/json");
-              return;
-            }
+        if (length > stockLen) {
+          Logger::log(Logger::ERROR,
+                      "Cut length exceeds stock: " + std::to_string(length) +
+                          " > " + std::to_string(stockLen));
+          res.status = 400;
+          res.set_content("{\"error\":\"Cut length exceeds stock length\"}",
+                          "application/json");
+          return;
+        }
 
-            for (int i = 0; i < quantity; i++) {
-              cuts.push_back(Cut(length, cutID++));
-            }
-          }
+        for (int i = 0; i < quantity; i++) {
+          cuts.push_back(Cut(length, cutID++));
+          totalCuts++;
+        }
+      }
 
-          if (cuts.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"No valid cuts provided\"}",
-                            "application/json");
-            return;
-          }
+      if (cuts.empty()) {
+        Logger::log(Logger::WARN, "No valid cuts provided");
+        res.status = 400;
+        res.set_content("{\"error\":\"No valid cuts provided\"}",
+                        "application/json");
+        return;
+      }
 
-          // Run optimization
-          auto startTime = std::chrono::high_resolution_clock::now();
-          Solution solution = optimizeCutting(cuts, stockLen, kerf);
-          auto endTime = std::chrono::high_resolution_clock::now();
+      // Log optimization parameters
+      std::stringstream logMsg;
+      logMsg << "Starting optimization - Job: " << jobName
+             << ", Stock: " << stockLen << "\", Kerf: " << kerf
+             << "\", Total cuts: " << totalCuts;
+      Logger::log(Logger::INFO, logMsg.str());
 
-          auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-              endTime - startTime);
+      // Run optimization
+      auto startTime = std::chrono::high_resolution_clock::now();
+      Solution solution = optimizeCutting(cuts, stockLen, kerf);
+      auto endTime = std::chrono::high_resolution_clock::now();
 
-          if (solution.num_sticks == 0) {
-            res.status = 500;
-            res.set_content("{\"error\":\"No solution found\"}",
-                            "application/json");
-            return;
-          }
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          endTime - startTime);
 
-          // Prepare response
-          json response;
-          response["jobName"] = jobName;
-          response["materialType"] = materialType;
-          response["stockLength"] = stockLen;
-          response["stockLengthPretty"] = prettyLen(stockLen);
-          response["kerf"] = kerf;
-          response["kerfPretty"] = toFraction(kerf);
-          response["solution"] = solutionToJson(solution, stockLen, kerf);
-          response["optimizationTime"] = duration.count() / 1000.0;
+      if (solution.num_sticks == 0) {
+        Logger::log(Logger::ERROR, "Optimization failed - no solution found");
+        res.status = 500;
+        res.set_content("{\"error\":\"No solution found\"}",
+                        "application/json");
+        return;
+      }
 
-          // Group cuts by length for summary
-          std::map<double, int> cutCounts;
-          for (const auto &cut : cuts) {
-            cutCounts[cut.length]++;
-          }
+      // Log results
+      logMsg.str("");
+      logMsg << "Optimization complete - Sticks: " << solution.num_sticks
+             << ", Waste: " << solution.total_waste
+             << "\", Time: " << duration.count() << "ms";
+      Logger::log(Logger::INFO, logMsg.str());
 
-          json cutsSum = json::array();
-          for (auto it = cutCounts.rbegin(); it != cutCounts.rend(); ++it) {
-            json item;
-            item["length"] = it->first;
-            item["lengthPretty"] = prettyLen(it->first);
-            item["quantity"] = it->second;
-            cutsSum.push_back(item);
-          }
-          response["cutsSummary"] = cutsSum;
+      // Prepare response
+      json response;
+      response["jobName"] = jobName;
+      response["materialType"] = materialType;
+      response["stockLength"] = stockLen;
+      response["stockLengthPretty"] = prettyLen(stockLen);
+      response["kerf"] = kerf;
+      response["kerfPretty"] = toFraction(kerf);
+      response["solution"] = solutionToJson(solution, stockLen, kerf);
+      response["optimizationTime"] = duration.count() / 1000.0;
 
-          res.set_content(response.dump(), "application/json");
+      // Group cuts by length for summary
+      std::map<double, int> cutCounts;
+      for (const auto &cut : cuts) {
+        cutCounts[cut.length]++;
+      }
 
-        } catch (const std::exception &e) {
+      json cutsSum = json::array();
+      for (auto it = cutCounts.rbegin(); it != cutCounts.rend(); ++it) {
+        json item;
+        item["length"] = it->first;
+        item["lengthPretty"] = prettyLen(it->first);
+        item["quantity"] = it->second;
+        cutsSum.push_back(item);
+      }
+      response["cutsSummary"] = cutsSum;
+
+      res.set_content(response.dump(), "application/json");
+
+    } catch (const json::parse_error &e) {
+      Logger::log(Logger::ERROR, "JSON parse error: " + std::string(e.what()));
+      json error;
+      error["error"] = "Invalid JSON format";
+      res.status = 400;
+      res.set_content(error.dump(), "application/json");
+    } catch (const std::exception &e) {
+      Logger::log(Logger::ERROR, "Server error: " + std::string(e.what()));
+      json error;
+      error["error"] = std::string("Server error: ") + e.what();
+      res.status = 500;
+      res.set_content(error.dump(), "application/json");
+    }
+  });
+
+  // Handle 404s
+  svr.set_error_handler(
+      [](const httplib::Request &req, httplib::Response &res) {
+        if (res.status == 404) {
           json error;
-          error["error"] = std::string("Server error: ") + e.what();
-          res.status = 500;
+          error["error"] = "Not found";
+          error["path"] = req.path;
           res.set_content(error.dump(), "application/json");
+          Logger::log(Logger::WARN, "404 Not Found: " + req.path);
         }
       });
 
-  std::cout << "1D Nesting Software server starting on http://0.0.0.0:8080\n";
-  std::cout << "Press Ctrl+C to stop\n";
+  Logger::log(Logger::INFO, "==========================================");
+  Logger::log(Logger::INFO, "    1D Nesting Software Server v1.0");
+  Logger::log(Logger::INFO, "==========================================");
+  Logger::log(Logger::INFO, "Starting server on http://0.0.0.0:8080");
+  Logger::log(Logger::INFO, "Available endpoints:");
+  Logger::log(Logger::INFO, "  GET  /              - Web interface");
+  Logger::log(Logger::INFO, "  GET  /api/health    - Health check");
+  Logger::log(Logger::INFO, "  POST /api/optimize  - Run optimization");
+  Logger::log(Logger::INFO, "==========================================");
+  Logger::log(Logger::INFO, "Press Ctrl+C to stop");
 
   if (!svr.listen("0.0.0.0", 8080)) {
-    std::cerr << "Failed to start server\n";
+    Logger::log(Logger::ERROR, "Failed to start server - port may be in use");
     return 1;
   }
 
+  Logger::log(Logger::INFO, "Server stopped");
   return 0;
 }
