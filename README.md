@@ -60,7 +60,7 @@ chmod +x setup-deps.sh
 make web
 
 # Run the server
-./bin/tube-designer-server
+./bin/nesting-server
 ```
 
 ## Input Examples

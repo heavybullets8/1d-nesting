@@ -14,7 +14,7 @@ BUILD_DIR = build
 BIN_DIR = bin
 
 # Target executable
-TARGET = $(BIN_DIR)/tube-designer
+TARGET = $(BIN_DIR)/nesting
 
 # Source files
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
@@ -72,7 +72,7 @@ web: directories
 		$(SRC_DIR)/parse.cpp \
 		$(SRC_DIR)/algorithm.cpp \
 		$(SRC_DIR)/output.cpp \
-		-o $(BIN_DIR)/tube-designer-server \
+		-o $(BIN_DIR)/nesting-server \
 		$(LDFLAGS) -lpthread
 
 # -----------------

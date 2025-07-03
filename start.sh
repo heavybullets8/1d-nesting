@@ -60,7 +60,7 @@ else
   echo ""
   echo "You can still build locally with Make:"
   echo "  make web"
-  echo "  ./bin/tube-designer-server"
+  echo "  ./bin/nesting-server"
   echo ""
   echo "Or install Docker: https://docs.docker.com/get-docker/"
   exit 1
