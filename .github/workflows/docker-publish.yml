@@ -54,7 +54,7 @@ jobs:
       # 4  Build (always) | Push (only for tag builds)
       - name: Build and (conditionally) push Docker image
         id: build
-        uses: docker/build-push-action@v5.7.0
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./docker/Dockerfile
