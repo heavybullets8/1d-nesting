@@ -925,7 +925,10 @@
         function parseAdvancedLength(s) {
             let input = s.trim();
             if (!input) return 0;
-            
+
+            // Normalize smart quotes to straight quotes
+            input = input.replace(/[\u2018\u2019]/g, "'");
+
             let totalInches = 0;
             
             const feetPos = input.indexOf("'");
