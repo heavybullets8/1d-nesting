@@ -14,7 +14,7 @@ A lightweight tool that finds efficient cutting patterns for linear stock. It us
 
 ```bash
 # clone and run with docker compose
-git clone https://github.com/yourusername/1d-nesting-software.git
+git clone https://github.com/heavybullets8/1d-nesting-software.git
 cd 1d-nesting-software
 docker-compose -f docker/docker-compose.yml up
 ```
