@@ -22,7 +22,11 @@ httplib::Server* g_svr = nullptr;
 
 void signalHandler(int signum) {
   if (g_svr) {
-    std::cout << "\n[INFO ] Shutting down server gracefully..." << std::endl;
+    json log;
+    log["timestamp"] = std::time(nullptr);
+    log["level"] = "INFO";
+    log["message"] = "Shutting down server gracefully";
+    std::cout << log.dump() << std::endl;
     g_svr->stop();
   }
 }
@@ -31,32 +35,44 @@ class Logger {
 public:
   enum Level { DEBUG, INFO, WARN, ERROR };
 
-  static void log(Level level, const std::string& message) {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                  now.time_since_epoch()) %
-              1000;
-
-    std::cout << std::put_time(std::localtime(&time_t), "[%Y-%m-%d %H:%M:%S");
-    std::cout << "." << std::setfill('0') << std::setw(3) << ms.count() << "] ";
-
+  static std::string levelToString(Level level) {
     switch (level) {
-      case DEBUG:
-        std::cout << "[DEBUG] ";
-        break;
-      case INFO:
-        std::cout << "[INFO ] ";
-        break;
-      case WARN:
-        std::cout << "[WARN ] ";
-        break;
-      case ERROR:
-        std::cout << "[ERROR] ";
-        break;
+      case DEBUG: return "DEBUG";
+      case INFO: return "INFO";
+      case WARN: return "WARN";
+      case ERROR: return "ERROR";
+      default: return "UNKNOWN";
+    }
+  }
+
+  static void log(Level level, const std::string& message) {
+    json log;
+    log["timestamp"] = std::time(nullptr);
+    log["level"] = levelToString(level);
+    log["message"] = message;
+    std::cout << log.dump() << std::endl;
+  }
+
+  static void logRequest(const std::string& method, const std::string& path,
+                         int status, const std::string& remoteAddr,
+                         const std::string& remotePort, double duration_ms = -1) {
+    if (path == "/" || path == "/api/health") {
+      return;
     }
 
-    std::cout << message << std::endl;
+    json log;
+    log["timestamp"] = std::time(nullptr);
+    log["level"] = status >= 400 ? "ERROR" : "INFO";
+    log["type"] = "http_request";
+    log["method"] = method;
+    log["path"] = path;
+    log["status"] = status;
+    log["remote_addr"] = remoteAddr;
+    log["remote_port"] = remotePort;
+    if (duration_ms >= 0) {
+      log["duration_ms"] = duration_ms;
+    }
+    std::cout << log.dump() << std::endl;
   }
 };
 
@@ -133,14 +149,8 @@ int main() {
 
   // Set up request logging
   svr.set_logger([](const httplib::Request& req, const httplib::Response& res) {
-    std::stringstream ss;
-    ss << req.method << " " << req.path << " - " << res.status;
-    ss << " - " << req.remote_addr << ":" << req.remote_port;
-    if (res.status >= 400) {
-      Logger::log(Logger::ERROR, ss.str());
-    } else {
-      Logger::log(Logger::INFO, ss.str());
-    }
+    Logger::logRequest(req.method, req.path, res.status,
+                       req.remote_addr, std::to_string(req.remote_port));
   });
 
   // Note: CORS headers will be set in each handler

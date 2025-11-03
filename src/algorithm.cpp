@@ -136,7 +136,10 @@ Solution optimizeCutting(const std::vector<Cut>& cuts, double stockLen,
       cutSlice.push_back(Cut(len, 0));
       preciseUsedLen += len;
     }
-    preciseUsedLen += cutSlice.size() * kerf;
+    // For n pieces, we need n-1 kerfs (between pieces, not after the last one)
+    if (cutSlice.size() > 0) {
+      preciseUsedLen += (cutSlice.size() - 1) * kerf;
+    }
 
     for (int s = 0; s < numSticks; s++) {
       Stick stick;
@@ -183,10 +186,12 @@ generatePatterns(const std::vector<long long>& availableCuts,
         // permutations
         for (size_t i = startIndex; i < uniqueCuts.size(); i++) {
           long long cutLength = uniqueCuts[i];
-          // A cut consumes the length of the piece PLUS the blade's kerf
-          if (remainingLen >= cutLength + kerf) {
+          // For n pieces, we need n-1 kerfs (between pieces, not after the last one)
+          // First cut: no kerf needed yet. Subsequent cuts: need kerf + cut length
+          long long requiredSpace = cutLength + (currentPattern.empty() ? 0 : kerf);
+          if (remainingLen >= requiredSpace) {
             currentPattern.push_back(cutLength);
-            findPatterns(i, remainingLen - (cutLength + kerf));
+            findPatterns(i, remainingLen - requiredSpace);
             currentPattern.pop_back(); // Backtrack for the next combination
           }
         }
