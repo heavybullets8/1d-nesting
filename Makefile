@@ -26,11 +26,27 @@ OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 # Build Flags
 # -----------------
 
-# Use shell to find the HiGHS path if available
+# Try to find HiGHS installation path
+# 1. Use nix-build to find HiGHS (NixOS primary method)
 HIGHS_INSTALL_PATH ?= $(shell nix-build --no-out-link '<nixpkgs>' -A highs 2>/dev/null || echo "")
-# Fallback to the hardcoded path if the above command fails
+
+# 2. Fallback to pkg-config if nix-build fails
 ifeq ($(HIGHS_INSTALL_PATH),)
-    HIGHS_INSTALL_PATH = /nix/store/l5kdwqh5i0g5b8xvifmrm1ql5jjbi3p2-highs-1.8.0
+    HIGHS_INSTALL_PATH := $(shell pkg-config --variable=prefix highs 2>/dev/null || echo "")
+endif
+
+# 3. Check common system paths
+ifeq ($(HIGHS_INSTALL_PATH),)
+    ifneq ($(wildcard /usr/include/highs),)
+        HIGHS_INSTALL_PATH := /usr
+    else ifneq ($(wildcard /usr/local/include/highs),)
+        HIGHS_INSTALL_PATH := /usr/local
+    endif
+endif
+
+# 4. Final fallback to hardcoded NixOS path (update with: nix-build --no-out-link '<nixpkgs>' -A highs)
+ifeq ($(HIGHS_INSTALL_PATH),)
+    HIGHS_INSTALL_PATH := /nix/store/l5kdwqh5i0g5b8xvifmrm1ql5jjbi3p2-highs-1.8.0
 endif
 
 # Compiler Flags

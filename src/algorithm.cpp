@@ -1,4 +1,5 @@
 #include "algorithm.h"
+
 #include <Highs.h>
 #include <algorithm>
 #include <cmath>
@@ -15,10 +16,10 @@ const int PRECISION_SCALE = 1024;
 
 // Forward declaration for the internal pattern generation function
 static std::vector<std::vector<long long>>
-generatePatterns(const std::vector<long long> &availableCuts,
+generatePatterns(const std::vector<long long>& availableCuts,
                  long long stockLen, long long kerf);
 
-Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
+Solution optimizeCutting(const std::vector<Cut>& cuts, double stockLen,
                          double kerf) {
   // --- SCALING: Convert all double inputs to scaled integers ---
   long long scaled_stockLen =
@@ -28,7 +29,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
 
   // Create a list of all required cuts, scaled to integers
   std::vector<long long> allScaledCuts;
-  for (const auto &cut : cuts) {
+  for (const auto& cut : cuts) {
     allScaledCuts.push_back(
         static_cast<long long>(std::round(cut.length * PRECISION_SCALE)));
   }
@@ -55,7 +56,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
 
   // Extract unique keys for consistent row ordering
   std::vector<long long> uniqueCutKeys;
-  for (const auto &[len, demand] : cutDemand) {
+  for (const auto& [len, demand] : cutDemand) {
     uniqueCutKeys.push_back(len);
   }
   std::sort(uniqueCutKeys.begin(), uniqueCutKeys.end());
@@ -78,7 +79,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
   std::vector<int> Aindex;
   std::vector<double> Avalue;
 
-  for (const auto &pattern : patterns) {
+  for (const auto& pattern : patterns) {
     std::unordered_map<long long, int> patternCounts;
     for (long long piece : pattern) {
       patternCounts[piece]++;
@@ -108,7 +109,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
 
   // Step 3: Solve the MIP model with HiGHS
   highs.passModel(model);
-  HighsStatus status = highs.run();
+  highs.run();
 
   if (highs.getModelStatus() != HighsModelStatus::kOptimal) {
     std::cerr << "HiGHS could not find an optimal solution. Status: "
@@ -117,7 +118,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
   }
 
   // Step 4: Convert the solver output, scaling back to doubles
-  const HighsSolution &solution = highs.getSolution();
+  const HighsSolution& solution = highs.getSolution();
   Solution result;
   double totalUsedLengthPrecise = 0.0;
 
@@ -126,7 +127,7 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
     if (numSticks == 0)
       continue;
 
-    const auto &pattern = patterns[i];
+    const auto& pattern = patterns[i];
     double preciseUsedLen = 0.0;
 
     std::vector<Cut> cutSlice;
@@ -158,11 +159,10 @@ Solution optimizeCutting(const std::vector<Cut> &cuts, double stockLen,
  * @brief Generates all possible cutting patterns using scaled integers.
  *
  * This function recursively finds all combinations of cuts that can fit onto a
- * single stock piece. Unlike the previous version, this generates ALL valid
- * patterns, not just the maximal ones, giving the solver more options.
- */
+ * single stock piece.  
+ * */
 static std::vector<std::vector<long long>>
-generatePatterns(const std::vector<long long> &availableCuts,
+generatePatterns(const std::vector<long long>& availableCuts,
                  long long stockLen, long long kerf) {
   std::set<long long> uniqueCutsSet(availableCuts.begin(), availableCuts.end());
   std::vector<long long> uniqueCuts(uniqueCutsSet.begin(), uniqueCutsSet.end());
@@ -196,7 +196,7 @@ generatePatterns(const std::vector<long long> &availableCuts,
   findPatterns(0, stockLen);
 
   // Remove duplicate patterns
-  for (auto &p : patterns) {
+  for (auto& p : patterns) {
     std::sort(p.begin(), p.end());
   }
   std::sort(patterns.begin(), patterns.end());

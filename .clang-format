@@ -1,0 +1,21 @@
+# .clang-format configuration for 1D Nesting Project
+---
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 80
+UseTab: Never
+BreakBeforeBraces: Attach
+PointerAlignment: Left
+ReferenceAlignment: Left
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+IncludeBlocks: Regroup
+IndentCaseLabels: true
+NamespaceIndentation: None
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+Standard: c++17

@@ -1,5 +1,6 @@
 #include "parse.h"
-#include <algorithm>
+#include "utils.h"
+
 #include <cctype>
 #include <cmath>
 #include <iostream>
@@ -7,16 +8,13 @@
 #include <sstream>
 #include <string>
 
-// Helper to find the greatest common divisor for fraction simplification
-static int gcd(int a, int b) { return b == 0 ? a : gcd(b, a % b); }
-
 /**
  * @brief Parses a string representing a fraction (e.g., "1/2") or a decimal
  * (e.g., "0.5").
  * @param s The input string.
  * @return The parsed value as a double. Returns 0.0 on failure.
  */
-double parseFraction(const std::string &s) {
+double parseFraction(const std::string& s) {
   std::string trimmed = std::regex_replace(s, std::regex("^\\s+|\\s+$"), "");
   if (trimmed.empty())
     return 0.0;
@@ -32,7 +30,7 @@ double parseFraction(const std::string &s) {
         if (den != 0) {
           return num / den;
         }
-      } catch (const std::exception &) {
+      } catch (const std::exception&) {
         return 0.0;
       }
     }
@@ -45,7 +43,7 @@ double parseFraction(const std::string &s) {
       if (pos == trimmed.length()) {
         return val;
       }
-    } catch (const std::exception &) {
+    } catch (const std::exception&) {
       return 0.0;
     }
   }
@@ -68,7 +66,7 @@ double parseFraction(const std::string &s) {
  * @param s The input string.
  * @return The total length in inches as a double.
  */
-double parseAdvancedLength(const std::string &s) {
+double parseAdvancedLength(const std::string& s) {
   std::string input = std::regex_replace(s, std::regex("^\\s+|\\s+$"), "");
   if (input.empty())
     return 0.0;
@@ -99,10 +97,8 @@ double parseAdvancedLength(const std::string &s) {
   // - "1/2" (just a fraction)
 
   // Remove any trailing inch mark first to simplify parsing
-  bool had_inch_mark = false;
   if (!input.empty() && input.back() == '"') {
     input.pop_back();
-    had_inch_mark = true;
     input = std::regex_replace(input, std::regex("^\\s+|\\s+$"), "");
   }
 

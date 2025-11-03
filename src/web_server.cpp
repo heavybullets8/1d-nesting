@@ -18,7 +18,7 @@
 
 using json = nlohmann::json;
 
-httplib::Server *g_svr = nullptr;
+httplib::Server* g_svr = nullptr;
 
 void signalHandler(int signum) {
   if (g_svr) {
@@ -31,7 +31,7 @@ class Logger {
 public:
   enum Level { DEBUG, INFO, WARN, ERROR };
 
-  static void log(Level level, const std::string &message) {
+  static void log(Level level, const std::string& message) {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -42,18 +42,18 @@ public:
     std::cout << "." << std::setfill('0') << std::setw(3) << ms.count() << "] ";
 
     switch (level) {
-    case DEBUG:
-      std::cout << "[DEBUG] ";
-      break;
-    case INFO:
-      std::cout << "[INFO ] ";
-      break;
-    case WARN:
-      std::cout << "[WARN ] ";
-      break;
-    case ERROR:
-      std::cout << "[ERROR] ";
-      break;
+      case DEBUG:
+        std::cout << "[DEBUG] ";
+        break;
+      case INFO:
+        std::cout << "[INFO ] ";
+        break;
+      case WARN:
+        std::cout << "[WARN ] ";
+        break;
+      case ERROR:
+        std::cout << "[ERROR] ";
+        break;
     }
 
     std::cout << message << std::endl;
@@ -61,7 +61,7 @@ public:
 };
 
 // Read file content
-std::string readFile(const std::string &path) {
+std::string readFile(const std::string& path) {
   std::ifstream file(path);
   if (!file.is_open()) {
     // Try alternate path (useful for Docker deployments)
@@ -77,7 +77,7 @@ std::string readFile(const std::string &path) {
 }
 
 // Convert Solution to JSON for API response
-json solutionToJson(const Solution &solution, double stockLen, double kerf) {
+json solutionToJson(const Solution& solution, double stockLen, double kerf) {
   json result;
   result["num_sticks"] = solution.num_sticks;
   result["total_waste"] = solution.total_waste;
@@ -91,14 +91,14 @@ json solutionToJson(const Solution &solution, double stockLen, double kerf) {
   auto patterns = groupPatterns(solution.sticks);
   json patternsJson = json::array();
 
-  for (const auto &p : patterns) {
+  for (const auto& p : patterns) {
     json pattern;
     pattern["count"] = p.count;
     pattern["used_len"] = p.used_len;
     pattern["waste_len"] = p.waste_len;
 
     json cutsJson = json::array();
-    for (const auto &cut : p.cuts) {
+    for (const auto& cut : p.cuts) {
       json cutJson;
       cutJson["length"] = cut.length;
       cutJson["pretty_length"] = prettyLen(cut.length);
@@ -132,7 +132,7 @@ int main() {
   g_svr = &svr; // Store global reference for signal handler
 
   // Set up request logging
-  svr.set_logger([](const httplib::Request &req, const httplib::Response &res) {
+  svr.set_logger([](const httplib::Request& req, const httplib::Response& res) {
     std::stringstream ss;
     ss << req.method << " " << req.path << " - " << res.status;
     ss << " - " << req.remote_addr << ":" << req.remote_port;
@@ -146,7 +146,7 @@ int main() {
   // Note: CORS headers will be set in each handler
 
   // Serve the main page
-  svr.Get("/", [](const httplib::Request &req, httplib::Response &res) {
+  svr.Get("/", [](const httplib::Request& req, httplib::Response& res) {
     std::string content = readFile("static/index.html");
     if (content.empty()) {
       Logger::log(Logger::ERROR,
@@ -162,7 +162,7 @@ int main() {
 
   // Serve static files
   svr.Get("/static/(.*)",
-          [](const httplib::Request &req, httplib::Response &res) {
+          [](const httplib::Request& req, httplib::Response& res) {
             std::string path = "static/" + req.matches[1].str();
             std::string content = readFile(path);
             if (content.empty()) {
@@ -188,13 +188,13 @@ int main() {
 
   // Health check endpoint
   svr.Get("/api/health",
-          [](const httplib::Request &req, httplib::Response &res) {
+          [](const httplib::Request& req, httplib::Response& res) {
             res.set_content("{\"status\":\"ok\"}", "application/json");
           });
 
   // Handle OPTIONS requests for CORS
   svr.Options(
-      "/api/optimize", [](const httplib::Request &req, httplib::Response &res) {
+      "/api/optimize", [](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
@@ -202,8 +202,8 @@ int main() {
       });
 
   // Main optimization endpoint
-  svr.Post("/api/optimize", [](const httplib::Request &req,
-                               httplib::Response &res) {
+  svr.Post("/api/optimize", [](const httplib::Request& req,
+                               httplib::Response& res) {
     res.set_header("Access-Control-Allow-Origin", "*");
     res.set_header("Content-Type", "application/json");
 
@@ -241,7 +241,7 @@ int main() {
       int cutID = 1;
       int totalCuts = 0;
 
-      for (const auto &cutItem : cutsArray) {
+      for (const auto& cutItem : cutsArray) {
         double length =
             parseAdvancedLength(cutItem["length"].get<std::string>());
         int quantity = cutItem["quantity"].get<int>();
@@ -320,7 +320,7 @@ int main() {
 
       // Group cuts by length for summary
       std::map<double, int> cutCounts;
-      for (const auto &cut : cuts) {
+      for (const auto& cut : cuts) {
         cutCounts[cut.length]++;
       }
 
@@ -336,13 +336,13 @@ int main() {
 
       res.set_content(response.dump(), "application/json");
 
-    } catch (const json::parse_error &e) {
+    } catch (const json::parse_error& e) {
       Logger::log(Logger::ERROR, "JSON parse error: " + std::string(e.what()));
       json error;
       error["error"] = "Invalid JSON format";
       res.status = 400;
       res.set_content(error.dump(), "application/json");
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
       Logger::log(Logger::ERROR, "Server error: " + std::string(e.what()));
       json error;
       error["error"] = std::string("Server error: ") + e.what();
@@ -353,7 +353,7 @@ int main() {
 
   // Handle 404s
   svr.set_error_handler(
-      [](const httplib::Request &req, httplib::Response &res) {
+      [](const httplib::Request& req, httplib::Response& res) {
         if (res.status == 404) {
           json error;
           error["error"] = "Not found";

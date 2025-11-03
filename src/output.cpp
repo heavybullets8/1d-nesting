@@ -1,4 +1,6 @@
 #include "output.h"
+#include "utils.h"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -6,10 +8,6 @@
 #include <map>
 #include <sstream>
 #include <vector>
-
-// Helper to find the greatest common divisor for fraction simplification
-// Made static to prevent linker errors from multiple definitions.
-static int gcd(int a, int b) { return b == 0 ? a : gcd(b, a % b); }
 
 /**
  * @brief Converts a decimal value into a simplified fraction string.
@@ -51,12 +49,12 @@ std::string toFraction(double value) {
  * @param sticks A vector of Stick objects representing the cutting solution.
  * @return A vector of Pattern objects, where identical sticks are grouped.
  */
-std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
+std::vector<Pattern> groupPatterns(const std::vector<Stick>& sticks) {
   std::map<std::string, Pattern> patternMap;
 
-  for (const auto &stick : sticks) {
+  for (const auto& stick : sticks) {
     std::vector<double> lengths;
-    for (const auto &cut : stick.cuts) {
+    for (const auto& cut : stick.cuts) {
       lengths.push_back(cut.length);
     }
     std::sort(lengths.begin(), lengths.end(), std::greater<double>());
@@ -77,7 +75,7 @@ std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
       Pattern p;
       p.cuts = stick.cuts;
       std::sort(p.cuts.begin(), p.cuts.end(),
-                [](const Cut &a, const Cut &b) { return a.length > b.length; });
+                [](const Cut& a, const Cut& b) { return a.length > b.length; });
       p.count = 1;
       p.used_len = stick.used_len;
       p.waste_len = stick.waste_len;
@@ -86,12 +84,12 @@ std::vector<Pattern> groupPatterns(const std::vector<Stick> &sticks) {
   }
 
   std::vector<Pattern> patterns;
-  for (const auto &[key, p] : patternMap) {
+  for (const auto& [key, p] : patternMap) {
     patterns.push_back(p);
   }
 
   std::sort(patterns.begin(), patterns.end(),
-            [](const Pattern &a, const Pattern &b) {
+            [](const Pattern& a, const Pattern& b) {
               if (a.count != b.count) {
                 return a.count > b.count;
               }

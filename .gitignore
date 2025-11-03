@@ -5,9 +5,9 @@ bin/
 *.obj
 
 # Executable files
-tube-designer
-tube-designer.exe
-tube-designer-server
+nesting
+nesting.exe
+nesting-server
 
 # Downloaded single-header libraries
 include/httplib.h
@@ -19,6 +19,8 @@ include/json.hpp
 *.swp
 *.swo
 *~
+.cache/
+compile_commands.json
 
 # Output files
 cut_plan.html

@@ -14,14 +14,39 @@ A lightweight tool that finds efficient cutting patterns for linear stock. It us
 
 ```bash
 # clone and run with docker compose
-git clone https://github.com/heavybullets8/1d-nesting-software.git
-cd 1d-nesting-software
+git clone https://github.com/heavybullets8/1d-nesting.git
+cd 1d-nesting
 docker-compose -f docker/docker-compose.yml up
 ```
 
 Open `http://localhost:8080` to use the UI.
 
-To build locally, run `./setup-deps.sh` followed by `make web`.
+## Development
+
+### NixOS / Nix users
+
+Enter the development shell (provides all dependencies + LSP support):
+```bash
+nix-shell
+```
+
+This automatically:
+- Installs all dependencies (HiGHS, build tools, clang-tools)
+- Sets up environment variables for LSP
+- Generates `compile_commands.json` for clangd
+
+Then build with:
+```bash
+make web
+```
+
+### Other systems
+
+Install dependencies and build:
+```bash
+./setup-deps.sh
+make web
+```
 
 ## Example input
 
