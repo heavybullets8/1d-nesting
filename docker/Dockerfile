@@ -1,5 +1,5 @@
 # Use Ubuntu Plucky (25.04) as the base image, where HiGHS packages are available
-FROM ubuntu:25.10 AS builder
+FROM ubuntu:26.04 AS builder
 
 # Set frontend noninteractive to prevent prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
@@ -34,7 +34,7 @@ RUN g++ -std=c++17 -O3 -DNDEBUG \
   -L/usr/lib -lhighs \
   -lpthread
 
-FROM ubuntu:25.10
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
